@@ -631,24 +631,15 @@ def render_config_manager():
         st.markdown("---")
 
     # 配置列表（只读显示，点击编辑）
-    st.subheader("📋 资产配置列表")
-
-    assets = st.session_state.get('assets', [])
-
-    if not assets:
-        st.warning("⚠️ 当前没有配置任何资产，点击上方「➕ 添加资产」开始")
-        return
-
-    # 显示资产列表
-    # 添加刷新价格按钮
-    col_list, col_refresh = st.columns([5, 1])
-    with col_list:
+    # 标题和刷新按钮
+    col_header, col_refresh = st.columns([5, 1])
+    with col_header:
         st.subheader("📋 资产配置列表")
     with col_refresh:
         if st.button("🔄 刷新价格", key="refresh_prices", use_container_width=True):
             if 'current_price_cache' in st.session_state:
                 del st.session_state.current_price_cache
-            st.success("✅ 价格缓存已清除，请刷新页面")
+            st.cache_data.clear()
             st.rerun()
 
     assets = st.session_state.get('assets', [])
@@ -678,28 +669,27 @@ def render_config_manager():
                     current_amount = current_price * shares
                 else:
                     # 实时获取价格
-                    with st.spinner(f"获取 {code} 价格中..."):
-                        fetcher = DataFetcher()
-                        end = datetime.now().strftime('%Y-%m-%d')
-                        start = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+                    fetcher = DataFetcher()
+                    end = datetime.now().strftime('%Y-%m-%d')
+                    start = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
 
-                        temp_asset = {
-                            '代码': code,
-                            '名称': asset.get('名称', ''),
-                            '代码类型': code_type,
-                            '资产类别': asset.get('资产类别', '股票'),
-                            '初始份额': 1.0
-                        }
-                        history = fetcher.fetch_asset_data(temp_asset, start, end)
-                        if not history.empty and '净值' in history.columns:
-                            current_price = history['净值'].iloc[-1]
-                            st.session_state.current_price_cache[cache_key] = current_price
-                            current_amount = current_price * shares
-                            logger.info(f"获取 {code} 价格成功: {current_price:.4f}")
-                        else:
-                            logger.warning(f"获取 {code} 价格失败: 数据为空")
+                    temp_asset = {
+                        '代码': code,
+                        '名称': asset.get('名称', ''),
+                        '代码类型': code_type,
+                        '资产类别': asset.get('资产类别', '股票'),
+                        '初始份额': 1.0
+                    }
+                    history = fetcher.fetch_asset_data(temp_asset, start, end)
+                    if not history.empty and '净值' in history.columns:
+                        current_price = history['净值'].iloc[-1]
+                        st.session_state.current_price_cache[cache_key] = current_price
+                        current_amount = current_price * shares
+                        logger.info(f"获取 {code} 价格成功: {current_price:.4f}, 金额: {current_amount:.2f}")
+                    else:
+                        logger.warning(f"获取 {code} 价格失败: history为空或无净值列")
             except Exception as e:
-                logger.error(f"获取 {code} 当前价格失败: {e}")
+                logger.error(f"获取 {code} 当前价格异常: {e}")
 
         # 构建显示信息
         holding_display = f"{shares:,.2f} 份" if shares and shares > 0 else "未配置"
