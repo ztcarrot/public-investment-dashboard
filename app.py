@@ -29,10 +29,15 @@ st.set_page_config(
 )
 
 
-def load_data(date_range="最近90天", custom_days=None):
+def load_data(date_range="最近90天", custom_days=None, custom_date_str=None):
     """加载或抓取数据"""
     # 手动缓存管理
-    cache_key = f"data_cache_{date_range}_{custom_days}"
+    # 对于自定义日期，使用日期字符串作为key的一部分而不是天数差
+    if date_range == "自定义日期" and custom_date_str:
+        cache_key = f"data_cache_custom_{custom_date_str}"
+    else:
+        cache_key = f"data_cache_{date_range}"
+
     if cache_key in st.session_state:
         return st.session_state[cache_key]
 
@@ -878,6 +883,7 @@ def main():
 
         # 如果选择自定义，显示日期选择器
         custom_days = None
+        custom_date_str = None
         if date_range == "自定义日期":
             # 确保是date类型
             saved_date = st.session_state.custom_start_date
@@ -893,14 +899,15 @@ def main():
                 key="custom_date_input"
             )
 
-            # 计算天数
+            # 计算天数并格式化日期字符串（用于缓存key）
             days_diff = (datetime.now().date() - custom_start_date).days
             custom_days = days_diff
+            custom_date_str = custom_start_date.strftime('%Y-%m-%d')
 
     st.markdown("---")
 
     # 加载数据
-    historical_data, portfolio_data = load_data(date_range, custom_days)
+    historical_data, portfolio_data = load_data(date_range, custom_days, custom_date_str)
 
     if historical_data is None or portfolio_data is None:
         st.error("❌ 数据加载失败，请检查网络连接或配置")
