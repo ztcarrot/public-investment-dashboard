@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  investment-dashboard:
+    build: .
+    container_name: investment-dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      # 持久化配置和数据
+      - ./data:/app/data
+      - ./config:/app/config
+      - ./logs:/app/logs
+    environment:
+      - TZ=Asia/Shanghai
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

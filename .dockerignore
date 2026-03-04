@@ -1,0 +1,44 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env/
+venv/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data
+data/*.xlsx
+data/*.csv
+*.log
+
+# Documentation
+README.md
+QUICKSTART.md
+DEPLOYMENT.md
+LICENSE
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
