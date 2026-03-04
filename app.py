@@ -828,13 +828,11 @@ def main():
                 help="相比前一天的涨跌幅"
             )
         else:
-            # 隐藏金额，只显示百分比变化
-            st.metric(
-                "当前总金额",
-                "******",
-                delta=f"{total_stats['daily_change']:+.2f}%" if total_stats['daily_change'] is not None else None,
-                help="相比前一天的涨跌幅"
-            )
+            # 隐藏金额，使用markdown显示
+            st.markdown("### 当前总金额")
+            st.markdown("###### \*\*\*\*\*\*")
+            if total_stats['daily_change'] is not None:
+                st.markdown(f"*日涨跌: {total_stats['daily_change']:+.2f}%*")
 
     with col_total2:
         if total_stats['weekly_change'] is not None:
@@ -881,11 +879,10 @@ def main():
                     delta=f"{asset_stats['daily_change']:+.2f}%" if asset_stats and asset_stats['daily_change'] is not None else None
                 )
             else:
-                st.metric(
-                    "总金额",
-                    "******",
-                    delta=f"{asset_stats['daily_change']:+.2f}%" if asset_stats and asset_stats['daily_change'] is not None else None
-                )
+                # 隐藏金额显示
+                st.markdown("**总金额:** \*\*\*\*\*\*")
+                if asset_stats and asset_stats['daily_change'] is not None:
+                    st.caption(f"日涨跌: {asset_stats['daily_change']:+.2f}%")
 
             # 占比（始终显示）
             st.metric(
