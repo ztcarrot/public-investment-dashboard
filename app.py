@@ -464,41 +464,44 @@ def render_config_manager():
                     help="选择资产类别"
                 )
 
-                # 份额/金额联动输入
+                # 持有信息输入
                 st.markdown("**持有信息**")
-                input_mode = st.radio(
-                    "输入方式",
-                    options=["按份额", "按金额"],
-                    index=0 if current_asset.get('初始份额') else 1,
-                    horizontal=True,
-                    help="选择输入方式，另一个会自动计算"
-                )
 
-                # 获取当前价格（用于金额模式下计算份额）
+                # 获取当前价格（用于金额计算）
                 current_price = None
                 if code and len(code) == 6:
-                    with st.spinner(f"正在获取 {code} 的当前价格..."):
-                        try:
-                            fetcher = DataFetcher()
-                            # 获取最近一天的数据
-                            from datetime import datetime, timedelta
-                            end = datetime.now().strftime('%Y-%m-%d')
-                            start = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+                    if 'current_price_cache' not in st.session_state:
+                        st.session_state.current_price_cache = {}
 
-                            temp_asset = {
-                                '代码': code,
-                                '代码类型': code_type,
-                                '初始份额': 1.0  # 临时值，用于获取价格
-                            }
-                            history = fetcher.fetch_asset_data(temp_asset, start, end)
-                            if not history.empty and '净值' in history.columns:
-                                current_price = history['净值'].iloc[-1]
-                        except Exception as e:
-                            st.warning(f"⚠️ 无法获取价格: {str(e)}")
+                    cache_key = f"{code}_{code_type}"
+                    if cache_key not in st.session_state.current_price_cache:
+                        with st.spinner(f"正在获取 {code} 的当前价格..."):
+                            try:
+                                fetcher = DataFetcher()
+                                from datetime import datetime, timedelta
+                                end = datetime.now().strftime('%Y-%m-%d')
+                                start = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
 
-                if input_mode == "按份额":
+                                temp_asset = {
+                                    '代码': code,
+                                    '代码类型': code_type,
+                                    '初始份额': 1.0
+                                }
+                                history = fetcher.fetch_asset_data(temp_asset, start, end)
+                                if not history.empty and '净值' in history.columns:
+                                    current_price = history['净值'].iloc[-1]
+                                    st.session_state.current_price_cache[cache_key] = current_price
+                            except Exception as e:
+                                st.warning(f"⚠️ 无法获取价格: {str(e)}")
+                    else:
+                        current_price = st.session_state.current_price_cache.get(cache_key)
+
+                # 持有份额输入
+                col_shares, col_calc = st.columns([3, 1])
+
+                with col_shares:
                     shares = st.number_input(
-                        "初始份额 *",
+                        "持有份额 *",
                         min_value=0.0,
                         step=100.0,
                         value=float(current_asset.get('初始份额', 0) if current_asset.get('初始份额') is not None else 0.0),
@@ -506,29 +509,57 @@ def render_config_manager():
                         help="输入持有份额"
                     )
 
-                    # 显示当前价值预估
-                    if current_price and shares > 0:
+                with col_calc:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("💰", help="根据金额计算份额", key="calc_from_amount"):
+                        st.session_state.show_amount_dialog = True
+
+                # 显示当前价格信息
+                if current_price:
+                    if shares > 0:
                         estimated_value = current_price * shares
-                        st.info(f"💰 当前价格: ¥{current_price:.4f} → 预估市值: ¥{estimated_value:,.2f}")
-
-                    amount = None
-                else:
-                    amount = st.number_input(
-                        "初始金额（元）*",
-                        min_value=0.0,
-                        step=1000.0,
-                        value=float(current_asset.get('初始金额', 0) if current_asset.get('初始金额') is not None else 0.0),
-                        format="%.2f",
-                        help="输入初始金额，系统会根据当前价格自动计算份额"
-                    )
-
-                    # 自动计算份额并显示
-                    if current_price and amount and amount > 0:
-                        calculated_shares = amount / current_price
-                        st.info(f"💰 当前价格: ¥{current_price:.4f} → 自动计算份额: {calculated_shares:,.2f} 份")
-                        shares = calculated_shares
+                        st.info(f"💰 当前价格: ¥{current_price:.4f} | 预估市值: ¥{estimated_value:,.2f}")
                     else:
-                        shares = None
+                        st.info(f"💰 当前价格: ¥{current_price:.4f}")
+                else:
+                    st.caption("💡 输入代码后自动获取当前价格")
+
+                # 金额计算对话框
+                if st.session_state.get('show_amount_dialog', False):
+                    with st.expander("💰 根据金额计算份额", expanded=True):
+                        st.write("输入您想要投资的金额，系统会根据当前价格自动计算份额")
+
+                        calc_amount = st.number_input(
+                            "投资金额（元）*",
+                            min_value=0.0,
+                            step=1000.0,
+                            value=10000.0,
+                            format="%.2f",
+                            help="输入您想投资的金额"
+                        )
+
+                        if current_price and calc_amount > 0:
+                            calculated_shares = calc_amount / current_price
+                            st.info(f"💵 投资金额: ¥{calc_amount:,.2f} | 当前价格: ¥{current_price:.4f} | 计算份额: **{calculated_shares:,.2f} 份**")
+
+                            col_confirm, col_cancel = st.columns(2)
+                            with col_confirm:
+                                if st.button("✅ 确认使用", use_container_width=True):
+                                    # 更新份额值
+                                    st.session_state.temp_shares = calculated_shares
+                                    st.session_state.show_amount_dialog = False
+                                    st.rerun()
+                            with col_cancel:
+                                if st.button("❌ 取消", use_container_width=True):
+                                    st.session_state.show_amount_dialog = False
+                                    st.rerun()
+                        elif calc_amount > 0:
+                            st.warning("⚠️ 请先输入代码以获取当前价格")
+
+                # 如果用户通过对话框计算了份额，使用计算的值
+                if st.session_state.get('temp_shares') and st.session_state.temp_shares > 0:
+                    shares = st.session_state.temp_shares
+                    del st.session_state.temp_shares
 
             col_submit1, col_submit2, col_submit3 = st.columns(3)
 
@@ -550,7 +581,7 @@ def render_config_manager():
                     '代码类型': code_type,
                     '资产类别': asset_category,
                     '初始份额': shares,
-                    '初始金额': amount
+                    '初始金额': None  # 统一使用份额，金额为None
                 }
 
                 # 验证
