@@ -345,7 +345,7 @@ def render_data_table(historical_data, portfolio_data):
 
 
 def render_config_manager():
-    """渲染配置管理页面"""
+    """渲染配置管理页面 - 使用表单编辑"""
     st.title("⚙️ 配置管理")
     st.markdown("---")
 
@@ -353,23 +353,22 @@ def render_config_manager():
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        if st.button("➕ 添加资产", type="secondary"):
-            st.info("💡 可以通过下方的表格直接添加新行")
+        if st.button("➕ 添加资产", type="primary"):
+            st.session_state.show_add_form = True
+            st.session_state.editing_index = None
+            st.rerun()
 
     with col2:
         if st.button("📤 导出配置", type="secondary"):
             assets = st.session_state.get('assets', [])
             if assets:
-                # 转换为DataFrame
-                df = pd.DataFrame(assets)
-                # 转换为JSON
-                json_data = df.to_json(orient='records', force_ascii=False, indent=2)
-                # 提供下载
+                json_data = json.dumps(assets, ensure_ascii=False, indent=2)
                 st.download_button(
                     label="下载配置文件",
                     data=json_data,
                     file_name=f"investment_config_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                    mime="application/json"
+                    mime="application/json",
+                    use_container_width=True
                 )
 
     with col3:
@@ -381,11 +380,8 @@ def render_config_manager():
         )
         if uploaded_file is not None:
             try:
-                # 读取上传的JSON文件
                 json_data = json.load(uploaded_file)
-                # 验证数据格式
                 if isinstance(json_data, list):
-                    # 验证每个资产配置
                     valid_assets = []
                     for asset in json_data:
                         is_valid, error_msg = validate_asset(asset)
@@ -405,7 +401,6 @@ def render_config_manager():
 
     with col4:
         if st.button("🔄 使用默认配置", type="secondary"):
-            # 使用确认对话框
             if 'confirm_reset' not in st.session_state:
                 st.session_state.confirm_reset = False
 
@@ -424,117 +419,174 @@ def render_config_manager():
 
     st.markdown("---")
 
-    # 配置表格
+    # 添加/编辑资产表单
+    if st.session_state.get('show_add_form', False):
+        st.subheader("📝 添加/编辑资产")
+
+        editing_index = st.session_state.get('editing_index')
+        is_edit = editing_index is not None
+
+        if is_edit:
+            assets = st.session_state.get('assets', [])
+            current_asset = assets[editing_index]
+            st.info(f"✏️ 正在编辑：{current_asset.get('名称', '未知')}")
+        else:
+            current_asset = {}
+
+        with st.form(key="asset_form"):
+            col_form1, col_form2 = st.columns(2)
+
+            with col_form1:
+                code = st.text_input(
+                    "代码 *",
+                    value=current_asset.get('代码', ''),
+                    help="6位代码，如：511130"
+                ).strip()
+
+                name = st.text_input(
+                    "名称 *",
+                    value=current_asset.get('名称', ''),
+                    help="资产名称"
+                ).strip()
+
+                code_type = st.selectbox(
+                    "代码类型 *",
+                    options=['场内ETF', '基金', '股票', '债券'],
+                    index=['场内ETF', '基金', '股票', '债券'].index(current_asset.get('代码类型', '场内ETF')),
+                    help="选择代码类型"
+                )
+
+            with col_form2:
+                asset_category = st.selectbox(
+                    "资产类别 *",
+                    options=['国债', '股票', '黄金', '现金'],
+                    index=['国债', '股票', '黄金', '现金'].index(current_asset.get('资产类别', '股票')),
+                    help="选择资产类别"
+                )
+
+                # 份额/金额联动输入
+                st.markdown("**持有信息**")
+                input_mode = st.radio(
+                    "输入方式",
+                    options=["按份额", "按金额"],
+                    index=0 if current_asset.get('初始份额') else 1,
+                    horizontal=True,
+                    help="选择输入方式，另一个会自动计算"
+                )
+
+                if input_mode == "按份额":
+                    shares = st.number_input(
+                        "初始份额 *",
+                        min_value=0.0,
+                        step=100.0,
+                        value=float(current_asset.get('初始份额', 0)),
+                        format="%.2f",
+                        help="输入持有份额"
+                    )
+                    amount = None
+                else:
+                    amount = st.number_input(
+                        "初始金额（元）*",
+                        min_value=0.0,
+                        step=1000.0,
+                        value=float(current_asset.get('初始金额', 0)),
+                        format="%.2f",
+                        help="输入初始金额，系统会根据当前价格自动计算份额"
+                    )
+                    shares = None
+
+            col_submit1, col_submit2, col_submit3 = st.columns(3)
+
+            with col_submit1:
+                submit = st.form_submit_button("💾 保存", use_container_width=True)
+
+            with col_submit2:
+                cancel = st.form_submit_button("❌ 取消", use_container_width=True)
+
+            with col_submit3:
+                if is_edit:
+                    delete = st.form_submit_button("🗑️ 删除", use_container_width=True)
+
+            if submit:
+                # 构建资产数据
+                asset = {
+                    '代码': code,
+                    '名称': name,
+                    '代码类型': code_type,
+                    '资产类别': asset_category,
+                    '初始份额': shares,
+                    '初始金额': amount
+                }
+
+                # 验证
+                is_valid, error_msg = validate_asset(asset)
+                if not is_valid:
+                    st.error(f"❌ {error_msg}")
+                else:
+                    assets = st.session_state.get('assets', [])
+
+                    if is_edit:
+                        assets[editing_index] = asset
+                        st.success(f"✅ 已更新资产：{name}")
+                    else:
+                        assets.append(asset)
+                        st.success(f"✅ 已添加资产：{name}")
+
+                    st.session_state.assets = assets
+                    save_to_session('investment_assets', assets)
+                    st.session_state.show_add_form = False
+                    st.session_state.editing_index = None
+                    st.rerun()
+
+            if cancel:
+                st.session_state.show_add_form = False
+                st.session_state.editing_index = None
+                st.rerun()
+
+            if is_edit and delete:
+                assets = st.session_state.get('assets', [])
+                deleted_name = assets[editing_index].get('名称', '未知')
+                assets.pop(editing_index)
+                st.session_state.assets = assets
+                save_to_session('investment_assets', assets)
+                st.session_state.show_add_form = False
+                st.session_state.editing_index = None
+                st.success(f"✅ 已删除资产：{deleted_name}")
+                st.rerun()
+
+        st.markdown("---")
+
+    # 配置列表（只读显示，点击编辑）
     st.subheader("📋 资产配置列表")
 
     assets = st.session_state.get('assets', [])
 
     if not assets:
-        st.warning("⚠️ 当前没有配置任何资产")
+        st.warning("⚠️ 当前没有配置任何资产，点击上方「➕ 添加资产」开始")
         return
 
-    # 转换为DataFrame用于显示
-    df = pd.DataFrame(assets)
+    # 显示资产列表
+    for idx, asset in enumerate(assets):
+        with st.expander(f"{idx + 1}. {asset['名称']} ({asset['代码']})", expanded=False):
+            col_info1, col_info2, col_info3 = st.columns([2, 2, 1])
 
-    # 添加序号列
-    df.insert(0, '序号', range(1, len(df) + 1))
+            with col_info1:
+                st.write(f"**代码**: {asset['代码']}")
+                st.write(f"**名称**: {asset['名称']}")
 
-    # 配置列的编辑选项
-    column_config = {
-        '序号': st.column_config.NumberColumn(
-            '序号',
-            width='small',
-            disabled=True
-        ),
-        '代码': st.column_config.TextColumn(
-            '代码',
-            width='small',
-            required=True
-        ),
-        '名称': st.column_config.TextColumn(
-            '名称',
-            width='medium',
-            required=True
-        ),
-        '代码类型': st.column_config.SelectboxColumn(
-            '代码类型',
-            options=['场内ETF', '基金', '股票', '债券'],
-            width='medium',
-            required=True
-        ),
-        '资产类别': st.column_config.SelectboxColumn(
-            '资产类别',
-            options=['国债', '股票', '黄金', '现金'],
-            width='medium',
-            required=True
-        ),
-        '初始份额': st.column_config.NumberColumn(
-            '初始份额',
-            width='medium',
-            min_value=0,
-            format="%.2f"
-        ),
-        '初始金额': st.column_config.NumberColumn(
-            '初始金额',
-            width='medium',
-            min_value=0,
-            format="%.2f"
-        )
-    }
+            with col_info2:
+                st.write(f"**代码类型**: {asset['代码类型']}")
+                st.write(f"**资产类别**: {asset['资产类别']}")
 
-    # 显示可编辑表格
-    edited_df = st.data_editor(
-        df,
-        column_config=column_config,
-        num_rows="dynamic",
-        use_container_width=True,
-        hide_index=True,
-        key="config_editor"
-    )
+            with col_info3:
+                if st.button(f"✏️ 编辑", key=f"edit_{idx}", use_container_width=True):
+                    st.session_state.show_add_form = True
+                    st.session_state.editing_index = idx
+                    st.rerun()
 
-    # 保存按钮
-    st.markdown("---")
-    col_save, col_cancel = st.columns(2)
-
-    with col_save:
-        if st.button("💾 保存配置", type="primary"):
-            # 移除序号列
-            df_to_save = edited_df.drop(columns=['序号'])
-
-            # 验证所有配置
-            valid_assets = []
-            errors = []
-
-            for idx, row in df_to_save.iterrows():
-                asset = row.to_dict()
-                is_valid, error_msg = validate_asset(asset)
-                if is_valid:
-                    valid_assets.append(asset)
-                else:
-                    errors.append(f"第 {idx + 1} 行：{asset.get('代码', '未知代码')}")
-
-            if errors:
-                st.error(f"❌ 配置验证失败：\n" + "\n".join(errors))
-            elif not valid_assets:
-                st.error("❌ 没有有效的资产配置")
-            else:
-                # 保存到session_state
-                st.session_state.assets = valid_assets
-                # 保存到LocalStorage
-                save_to_session('investment_assets', valid_assets)
-                st.success(f"✅ 成功保存 {len(valid_assets)} 个资产配置")
-                st.info("💡 配置已保存，请返回数据看板查看效果")
-
-    with col_cancel:
-        if st.button("❌ 取消"):
-            st.info("💡 未保存任何更改")
-            st.rerun()
-
-    # 显示当前配置统计
     st.markdown("---")
     st.caption(f"📊 当前配置：共 {len(assets)} 个资产")
-
-
+    st.caption("💡 提示：点击资产左侧的 ▶ 展开详情，点击「编辑」按钮修改配置")
 def load_assets_config():
     """加载资产配置 - 按优先级"""
     # 1. 尝试从 session_state 加载（用户修改后的配置）
