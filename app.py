@@ -807,7 +807,7 @@ def main():
 
         # 第一行：总资产信息
         st.markdown("### 💰 总资产概览")
-        col_total1, col_total2, col_total3 = st.columns(4)
+        col_total1, col_total2, col_total3 = st.columns(3)
 
         with col_total1:
             st.metric(
