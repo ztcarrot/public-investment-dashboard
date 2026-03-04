@@ -45,9 +45,11 @@ class DataFetcher:
             content = response.text
 
             # 提取净值数据
+            # 优先使用单位净值（NetWorthTrend），而不是累计净值（Data_netWorthTrend）
+            # 基金计算应该是：份额 × 单位净值
             patterns = [
-                r'Data_netWorthTrend.*?\[\[(.*?)\]\]',
-                r'NetWorthTrend.*?\[\[(.*?)\]\]',
+                r'NetWorthTrend.*?\[\[(.*?)\]\]',      # 单位净值（优先）
+                r'Data_netWorthTrend.*?\[\[(.*?)\]\]',  # 累计净值（备用）
             ]
 
             for pattern in patterns:
