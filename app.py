@@ -130,9 +130,10 @@ def render_total_assets_chart(portfolio_data):
     first_value = total_assets.iloc[0]
     last_value = total_assets.iloc[-1]
 
-    # 使用位置索引而不是标签索引，避免索引不连续的问题
-    max_idx = total_assets.idxmax()
-    min_idx = total_assets.idxmin()
+    # 使用 argmax/argmin 获取位置索引，而不是标签索引
+    import numpy as np
+    max_idx = np.argmax(total_assets.values)
+    min_idx = np.argmin(total_assets.values)
 
     # 使用iloc通过位置访问，更安全
     max_date = portfolio_data.iloc[max_idx]['日期']
