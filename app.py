@@ -138,6 +138,18 @@ def render_total_assets_chart(portfolio_data):
     first_date = portfolio_data.iloc[0]['日期']
     last_date = portfolio_data.iloc[-1]['日期']
 
+    # 确保日期是字符串格式用于显示
+    def format_date(date_val):
+        """格式化日期为字符串"""
+        if hasattr(date_val, 'strftime'):
+            return date_val.strftime('%Y-%m-%d')
+        return str(date_val)
+
+    max_date_str = format_date(max_date)
+    min_date_str = format_date(min_date)
+    first_date_str = format_date(first_date)
+    last_date_str = format_date(last_date)
+
     # 计算最大回撤
     max_drawdown = 0
     max_drawdown_start = None
@@ -160,6 +172,9 @@ def render_total_assets_chart(portfolio_data):
             max_drawdown = drawdown
             max_drawdown_start = portfolio_data.iloc[peak_idx]['日期']
             max_drawdown_end = portfolio_data.iloc[i]['日期']
+
+    max_drawdown_start_str = format_date(max_drawdown_start) if max_drawdown_start is not None else None
+    max_drawdown_end_str = format_date(max_drawdown_end) if max_drawdown_end is not None else None
 
     # 添加总资产折线
     fig.add_trace(go.Scatter(
@@ -282,14 +297,14 @@ def render_total_assets_chart(portfolio_data):
         st.metric(
             label="📈 最大值",
             value=f"¥{max_value:,.2f}",
-            help=f"日期: {max_date.strftime('%Y-%m-%d')}"
+            help=f"日期: {max_date_str}"
         )
 
     with col2:
         st.metric(
             label="📉 最小值",
             value=f"¥{min_value:,.2f}",
-            help=f"日期: {min_date.strftime('%Y-%m-%d')}"
+            help=f"日期: {min_date_str}"
         )
 
     with col3:
@@ -298,7 +313,7 @@ def render_total_assets_chart(portfolio_data):
             label="➡️ 初值→末值",
             value=f"¥{first_value:,.2f} → ¥{last_value:,.2f}",
             delta=f"{first_change:+.2f}%",
-            help=f"从 {first_date.strftime('%Y-%m-%d')} 到 {last_date.strftime('%Y-%m-%d')}"
+            help=f"从 {first_date_str} 到 {last_date_str}"
         )
 
     with col4:
@@ -306,7 +321,7 @@ def render_total_assets_chart(portfolio_data):
             label="📊 最大回撤",
             value=f"{max_drawdown*100:.2f}%",
             delta=f"从 ¥{max_value:,.2f} 回落",
-            help=f"回撤区间: {max_drawdown_start.strftime('%Y-%m-%d') if max_drawdown_start else 'N/A'} → {max_drawdown_end.strftime('%Y-%m-%d') if max_drawdown_end else 'N/A'}"
+            help=f"回撤区间: {max_drawdown_start_str} → {max_drawdown_end_str}"
         )
 
     st.markdown("---")
