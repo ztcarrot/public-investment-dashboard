@@ -914,6 +914,11 @@ def main():
                 date_str = st.session_state.custom_start_date.strftime('%Y-%m-%d')
                 st.query_params['custom_date'] = date_str
 
+            # 确保widget状态与saved_date同步
+            # 如果widget状态存在但与saved_date不同,更新它
+            if 'temp_custom_date' in st.session_state and st.session_state.temp_custom_date != saved_date:
+                st.session_state.temp_custom_date = saved_date
+
             custom_start_date = st.date_input(
                 "选择开始日期",
                 value=saved_date,
