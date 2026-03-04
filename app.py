@@ -838,45 +838,56 @@ def main():
             st.rerun()
 
     with col3:
-        # 日期范围选择 - 从session_state恢复上次的选择
+        # 日期范围选择
+        date_range_options = ["最近90天", "最近180天", "最近365天", "自定义日期"]
+
+        # 初始化或从session_state恢复选择
         if 'selected_date_range' not in st.session_state:
+            st.session_state.selected_date_range = "最近365天"
+
+        # 确保保存的值在选项列表中
+        if st.session_state.selected_date_range not in date_range_options:
             st.session_state.selected_date_range = "最近365天"
 
         date_range = st.selectbox(
             "数据范围",
-            options=["最近90天", "最近180天", "最近365天", "自定义日期"],
-            index=["最近90天", "最近180天", "最近365天", "自定义日期"].index(st.session_state.selected_date_range)
+            options=date_range_options,
+            index=date_range_options.index(st.session_state.selected_date_range),
+            key="date_range_selector"
         )
 
-        # 保存用户选择到session_state
+        # 更新session_state
         st.session_state.selected_date_range = date_range
 
         # 如果选择自定义，显示日期选择器
+        custom_days = None
         if date_range == "自定义日期":
-            # 从session_state获取之前选择的日期，如果没有则默认365天前
+            # 初始化自定义日期
             if 'custom_start_date' not in st.session_state:
                 default_date = datetime.now() - timedelta(days=365)
                 st.session_state.custom_start_date = default_date.date()
-            else:
-                # 确保是date类型
-                if isinstance(st.session_state.custom_start_date, datetime):
-                    st.session_state.custom_start_date = st.session_state.custom_start_date.date()
 
+            # 确保是date类型
+            saved_date = st.session_state.custom_start_date
+            if isinstance(saved_date, datetime):
+                saved_date = saved_date.date()
+                st.session_state.custom_start_date = saved_date
+
+            # 日期选择器
             custom_start_date = st.date_input(
                 "选择开始日期",
-                value=st.session_state.custom_start_date,
+                value=saved_date,
                 max_value=datetime.now().date(),
-                key="custom_date_input"
+                key="custom_date_picker"
             )
 
-            # 保存到session_state
-            st.session_state.custom_start_date = custom_start_date
+            # 每次都更新session_state
+            if custom_start_date != st.session_state.custom_start_date:
+                st.session_state.custom_start_date = custom_start_date
 
             # 计算天数
             days_diff = (datetime.now().date() - custom_start_date).days
             custom_days = days_diff
-        else:
-            custom_days = None
 
     st.markdown("---")
 
