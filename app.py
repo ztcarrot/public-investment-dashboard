@@ -648,6 +648,14 @@ def render_config_manager():
         st.warning("⚠️ 当前没有配置任何资产，点击上方「➕ 添加资产」开始")
         return
 
+    # 调试信息
+    if st.checkbox("显示调试信息"):
+        st.write("### 调试信息")
+        st.write(f"资产数量: {len(assets)}")
+        st.write(f"价格缓存: {st.session_state.get('current_price_cache', {})}")
+        for idx, asset in enumerate(assets):
+            st.write(f"{idx+1}. {asset['名称']} ({asset['代码']}) - 份额: {asset.get('初始份额', 0)}")
+
     # 显示资产列表
     for idx, asset in enumerate(assets):
         shares = asset.get('初始份额', 0)
@@ -671,7 +679,7 @@ def render_config_manager():
                     # 实时获取价格
                     fetcher = DataFetcher()
                     end = datetime.now().strftime('%Y-%m-%d')
-                    start = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+                    start = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
 
                     temp_asset = {
                         '代码': code,
@@ -682,14 +690,16 @@ def render_config_manager():
                     }
                     history = fetcher.fetch_asset_data(temp_asset, start, end)
                     if not history.empty and '净值' in history.columns:
-                        current_price = history['净值'].iloc[-1]
-                        st.session_state.current_price_cache[cache_key] = current_price
+                        current_price = float(history['净值'].iloc[-1])
                         current_amount = current_price * shares
-                        logger.info(f"获取 {code} 价格成功: {current_price:.4f}, 金额: {current_amount:.2f}")
+                        st.session_state.current_price_cache[cache_key] = current_price
+                        logger.info(f"✅ {code} 价格: {current_price:.4f}, 金额: {current_amount:.2f}")
                     else:
-                        logger.warning(f"获取 {code} 价格失败: history为空或无净值列")
+                        logger.warning(f"❌ {code} 获取失败: history为空")
             except Exception as e:
-                logger.error(f"获取 {code} 当前价格异常: {e}")
+                logger.error(f"❌ {code} 异常: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
 
         # 构建显示信息
         holding_display = f"{shares:,.2f} 份" if shares and shares > 0 else "未配置"
