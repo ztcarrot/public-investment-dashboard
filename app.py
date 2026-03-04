@@ -344,6 +344,185 @@ def render_data_table(historical_data, portfolio_data):
     )
 
 
+def render_config_manager():
+    """渲染配置管理页面"""
+    st.title("⚙️ 配置管理")
+    st.markdown("---")
+
+    # 操作按钮
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        if st.button("➕ 添加资产", type="secondary"):
+            st.info("💡 可以通过下方的表格直接添加新行")
+
+    with col2:
+        if st.button("📤 导出配置", type="secondary"):
+            assets = st.session_state.get('assets', [])
+            if assets:
+                # 转换为DataFrame
+                df = pd.DataFrame(assets)
+                # 转换为JSON
+                json_data = df.to_json(orient='records', force_ascii=False, indent=2)
+                # 提供下载
+                st.download_button(
+                    label="下载配置文件",
+                    data=json_data,
+                    file_name=f"investment_config_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    mime="application/json"
+                )
+
+    with col3:
+        uploaded_file = st.file_uploader(
+            "📥 导入配置",
+            type=['json'],
+            label_visibility="collapsed",
+            key="config_upload"
+        )
+        if uploaded_file is not None:
+            try:
+                # 读取上传的JSON文件
+                json_data = json.load(uploaded_file)
+                # 验证数据格式
+                if isinstance(json_data, list):
+                    # 验证每个资产配置
+                    valid_assets = []
+                    for asset in json_data:
+                        if validate_asset(asset):
+                            valid_assets.append(asset)
+                    if valid_assets:
+                        st.session_state.assets = valid_assets
+                        save_to_localstorage('investment_assets', valid_assets)
+                        st.success(f"✅ 成功导入 {len(valid_assets)} 个资产配置")
+                        st.rerun()
+                    else:
+                        st.error("❌ 导入的配置中没有有效的资产")
+                else:
+                    st.error("❌ 配置文件格式错误：应为资产列表")
+            except Exception as e:
+                st.error(f"❌ 导入配置失败: {str(e)}")
+
+    with col4:
+        if st.button("🔄 重置默认", type="secondary"):
+            if st.confirm("⚠️ 确定要恢复默认配置吗？当前配置将被覆盖"):
+                default_assets = get_default_assets()
+                st.session_state.assets = default_assets
+                save_to_localstorage('investment_assets', default_assets)
+                st.success("✅ 已恢复默认配置")
+                st.rerun()
+
+    st.markdown("---")
+
+    # 配置表格
+    st.subheader("📋 资产配置列表")
+
+    assets = st.session_state.get('assets', [])
+
+    if not assets:
+        st.warning("⚠️ 当前没有配置任何资产")
+        return
+
+    # 转换为DataFrame用于显示
+    df = pd.DataFrame(assets)
+
+    # 添加序号列
+    df.insert(0, '序号', range(1, len(df) + 1))
+
+    # 配置列的编辑选项
+    column_config = {
+        '序号': st.column_config.NumberColumn(
+            '序号',
+            width='small',
+            disabled=True
+        ),
+        '代码': st.column_config.TextColumn(
+            '代码',
+            width='small',
+            required=True
+        ),
+        '名称': st.column_config.TextColumn(
+            '名称',
+            width='medium',
+            required=True
+        ),
+        '代码类型': st.column_config.SelectboxColumn(
+            '代码类型',
+            options=['场内ETF', '基金', '股票', '债券'],
+            width='medium',
+            required=True
+        ),
+        '资产类别': st.column_config.SelectboxColumn(
+            '资产类别',
+            options=['国债', '股票', '黄金', '现金'],
+            width='medium',
+            required=True
+        ),
+        '初始份额': st.column_config.NumberColumn(
+            '初始份额',
+            width='medium',
+            min_value=0,
+            format="%.2f"
+        ),
+        '初始金额': st.column_config.NumberColumn(
+            '初始金额',
+            width='medium',
+            min_value=0,
+            format="%.2f"
+        )
+    }
+
+    # 显示可编辑表格
+    edited_df = st.data_editor(
+        df,
+        column_config=column_config,
+        num_rows="dynamic",
+        use_container_width=True,
+        hide_index=True,
+        key="config_editor"
+    )
+
+    # 保存按钮
+    st.markdown("---")
+    col_save, col_cancel = st.columns(2)
+
+    with col_save:
+        if st.button("💾 保存配置", type="primary"):
+            # 移除序号列
+            df_to_save = edited_df.drop(columns=['序号'])
+
+            # 验证所有配置
+            valid_assets = []
+            errors = []
+
+            for idx, row in df_to_save.iterrows():
+                asset = row.to_dict()
+                if validate_asset(asset):
+                    valid_assets.append(asset)
+                else:
+                    errors.append(f"第 {idx + 1} 行：{asset.get('代码', '未知代码')}")
+
+            if errors:
+                st.error(f"❌ 配置验证失败：\n" + "\n".join(errors))
+            elif not valid_assets:
+                st.error("❌ 没有有效的资产配置")
+            else:
+                # 保存到session_state
+                st.session_state.assets = valid_assets
+                # 保存到LocalStorage
+                save_to_localstorage('investment_assets', valid_assets)
+                st.success(f"✅ 成功保存 {len(valid_assets)} 个资产配置")
+                st.info("💡 配置已保存，请返回数据看板查看效果")
+
+    with col_cancel:
+        if st.button("❌ 取消"):
+            st.info("💡 未保存任何更改")
+            st.rerun()
+
+    # 显示当前配置统计
+    st.markdown("---")
+    st.caption(f"📊 当前配置：共 {len(assets)} 个资产")
+
+
 def load_assets_config():
     """加载资产配置 - 按优先级"""
     # 1. 尝试从 LocalStorage 加载
@@ -365,9 +544,6 @@ def load_assets_config():
 def main():
     """主函数"""
 
-    st.title("📊 投资组合仪表盘")
-    st.markdown("---")
-
     # 初始化session state
     if 'assets' not in st.session_state:
         st.session_state.assets = load_assets_config()
@@ -378,6 +554,31 @@ def main():
     # 初始化数字显示状态（默认隐藏）
     if 'show_numbers' not in st.session_state:
         st.session_state.show_numbers = False
+
+    # 侧边栏页面导航
+    with st.sidebar:
+        st.title("📊 导航")
+        page = st.radio(
+            "选择页面",
+            options=["📊 数据看板", "⚙️ 配置管理"],
+            index=0 if st.session_state.current_page == 'dashboard' else 1,
+            key="page_navigation"
+        )
+
+        # 更新当前页面
+        if page == "📊 数据看板":
+            st.session_state.current_page = 'dashboard'
+        else:
+            st.session_state.current_page = 'config'
+            st.rerun()
+
+    # 根据选择的页面显示不同内容
+    if st.session_state.current_page == 'config':
+        render_config_manager()
+        return
+
+    st.title("📊 投资组合仪表盘")
+    st.markdown("---")
 
     # 检查是否有配置
     assets = st.session_state.get('assets', [])
