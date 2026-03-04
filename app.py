@@ -900,24 +900,25 @@ def main():
                 saved_date = saved_date.date()
                 st.session_state.custom_start_date = saved_date
 
-            # 日期选择器（无key，避免状态管理冲突）
+            # 日期选择器（使用key确保状态正确管理）
+            def update_custom_date():
+                st.session_state.custom_start_date = st.session_state.temp_custom_date
+                logger.info(f"回调更新日期: {st.session_state.temp_custom_date}")
+
             custom_start_date = st.date_input(
                 "选择开始日期",
                 value=saved_date,
-                max_value=datetime.now().date()
+                max_value=datetime.now().date(),
+                key="temp_custom_date",
+                on_change=update_custom_date
             )
 
-            # 每次都更新session_state
-            if custom_start_date != st.session_state.custom_start_date:
-                st.session_state.custom_start_date = custom_start_date
-                logger.info(f"更新自定义日期: {custom_start_date}")
+            # 显示当前值和保存的值
+            st.caption(f"选择: {custom_start_date} | 💾 已保存: {st.session_state.custom_start_date}")
 
             # 计算天数
             days_diff = (datetime.now().date() - custom_start_date).days
             custom_days = days_diff
-
-            # 显示调试信息
-            st.caption(f"💾 已保存: {st.session_state.custom_start_date}")
 
     st.markdown("---")
 
