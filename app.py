@@ -838,19 +838,29 @@ def main():
             st.rerun()
 
     with col3:
-        # 日期范围选择
+        # 日期范围选择 - 从session_state恢复上次的选择
+        if 'selected_date_range' not in st.session_state:
+            st.session_state.selected_date_range = "最近365天"
+
         date_range = st.selectbox(
             "数据范围",
             options=["最近90天", "最近180天", "最近365天", "自定义日期"],
-            index=2  # 默认选择365天
+            index=["最近90天", "最近180天", "最近365天", "自定义日期"].index(st.session_state.selected_date_range)
         )
+
+        # 保存用户选择到session_state
+        st.session_state.selected_date_range = date_range
 
         # 如果选择自定义，显示日期选择器
         if date_range == "自定义日期":
             # 从session_state获取之前选择的日期，如果没有则默认365天前
             if 'custom_start_date' not in st.session_state:
                 default_date = datetime.now() - timedelta(days=365)
-                st.session_state.custom_start_date = default_date
+                st.session_state.custom_start_date = default_date.date()
+            else:
+                # 确保是date类型
+                if isinstance(st.session_state.custom_start_date, datetime):
+                    st.session_state.custom_start_date = st.session_state.custom_start_date.date()
 
             custom_start_date = st.date_input(
                 "选择开始日期",
