@@ -32,6 +32,9 @@ st.set_page_config(
 @st.cache_data(ttl=3600)
 def load_data(date_range="最近90天", custom_days=None):
     """加载或抓取数据"""
+    # 添加缓存键，包含date_range和custom_days
+    cache_key = f"{date_range}_{custom_days}"
+
     assets = st.session_state.get('assets', [])
 
     if not assets:
@@ -783,6 +786,10 @@ def main():
     if 'show_numbers' not in st.session_state:
         st.session_state.show_numbers = False
 
+    # 初始化日期范围选择（只在第一次运行时）
+    if 'selected_date_range' not in st.session_state:
+        st.session_state.selected_date_range = "最近365天"
+
     # 侧边栏页面导航
     with st.sidebar:
         st.title("📊 导航")
@@ -841,10 +848,6 @@ def main():
         # 日期范围选择
         date_range_options = ["最近90天", "最近180天", "最近365天", "自定义日期"]
 
-        # 初始化或从session_state恢复选择
-        if 'selected_date_range' not in st.session_state:
-            st.session_state.selected_date_range = "最近365天"
-
         # 确保保存的值在选项列表中
         if st.session_state.selected_date_range not in date_range_options:
             st.session_state.selected_date_range = "最近365天"
@@ -860,6 +863,7 @@ def main():
         # 如果用户改变了选择，更新session_state
         if date_range != st.session_state.selected_date_range:
             st.session_state.selected_date_range = date_range
+            logger.info(f"更新数据范围选择: {date_range}")
 
         # 如果选择自定义，显示日期选择器
         custom_days = None
