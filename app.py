@@ -843,13 +843,12 @@ def main():
         logger.info(f"从 localStorage 恢复: selected_date_range={restore_range}")
 
     if restore_date:
-        from datetime import datetime
         try:
             restored_date = datetime.strptime(restore_date, '%Y-%m-%d').date()
             st.session_state.custom_start_date = restored_date
             logger.info(f"从 localStorage 恢复: custom_start_date={restored_date}")
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"恢复日期失败: {e}")
 
     # 调试信息：显示关键session_state
     with st.expander("🔧 调试信息", expanded=False):
@@ -884,14 +883,14 @@ def main():
     if 'show_numbers' not in st.session_state:
         st.session_state.show_numbers = False
 
+    # 初始化自定义日期
+    if 'custom_start_date' not in st.session_state and st.session_state.get('selected_date_range') == '自定义日期':
+        default_date_dt = datetime.now() - timedelta(days=365)
+        st.session_state.custom_start_date = default_date_dt.date()
+
     # 初始化日期范围选择
     if 'selected_date_range' not in st.session_state:
         st.session_state.selected_date_range = "最近365天"
-
-    # 初始化自定义日期
-    if 'custom_start_date' not in st.session_state and st.session_state.get('selected_date_range') == '自定义日期':
-        default_date = datetime.now() - timedelta(days=365)
-        st.session_state.custom_start_date = default_date.date()
 
     # 保存配置到 localStorage 的函数
     def save_to_localstorage(date_range, custom_date=None):
@@ -993,8 +992,8 @@ def main():
         if date_range == "自定义日期":
             # 初始化自定义日期
             if 'custom_start_date' not in st.session_state:
-                default_date = datetime.now() - timedelta(days=365)
-                st.session_state.custom_start_date = default_date.date()
+                default_date_dt = datetime.now() - timedelta(days=365)
+                st.session_state.custom_start_date = default_date_dt.date()
 
             # 确保是date类型
             saved_date = st.session_state.custom_start_date
