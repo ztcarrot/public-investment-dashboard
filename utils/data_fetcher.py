@@ -232,8 +232,8 @@ class DataFetcher:
             price = self.get_bond_19789_current_price()
 
             if price:
-                # 生成最近60天的数据，基于最新价格和3%年化收益率倒推
-                import numpy as np
+                # 生成历史数据，特别国债价格相对稳定
+                # 使用较小的波动率，基于最新价格生成历史数据
                 from datetime import timedelta
 
                 start = datetime.strptime(start_date, '%Y-%m-%d')
@@ -242,14 +242,15 @@ class DataFetcher:
                 result = []
                 current_date = end
 
-                annual_return = 0.03
+                # 特别国债年化收益率约2.5%-3.5%
+                annual_return = 0.025
 
                 # 从最新日期向前推算
                 days_diff = 0
                 while current_date >= start:
-                    # 基于年化收益率计算价格
+                    # 基于年化收益率计算历史价格（时间越早价格越低）
                     years_diff = days_diff / 365.0
-                    calculated_price = price * ((1 + annual_return) ** years_diff)
+                    calculated_price = price / ((1 + annual_return) ** years_diff)
 
                     result.append({
                         '日期': current_date.strftime('%Y-%m-%d'),
@@ -284,9 +285,9 @@ class DataFetcher:
         if price:
             return price
 
-        # 方法2: 使用固定价格作为备用
-        logger.warning("19789 所有API获取失败，使用固定价格 100.87")
-        return 100.87
+        # 方法2: 使用固定价格作为备用（特别国债面值通常为100元）
+        logger.warning("19789 所有API获取失败，使用固定价格 100.00")
+        return 100.00
 
     def get_bond_19789_from_api(self) -> Optional[float]:
         """
@@ -307,10 +308,24 @@ class DataFetcher:
                     if response.status_code == 200:
                         data = response.json()
                         if data.get('data') and data['data'].get('f43'):
-                            # 债券价格需要除以1000（不是100）
-                            price = data['data']['f43'] / 1000
-                            logger.info(f"19789 从API获取价格: {price:.4f}")
-                            return price
+                            raw_price = data['data']['f43']
+                            # 债券价格判断：根据返回值大小决定除数
+                            # 如果价格 > 100000，说明是毫元单位，除以1000
+                            # 如果价格在 10000-100000 之间，可能是厘元单位，除以100
+                            # 如果价格 < 10000，说明已经是元单位
+                            if raw_price > 100000:
+                                price = raw_price / 1000
+                            elif raw_price > 10000:
+                                price = raw_price / 100
+                            else:
+                                price = raw_price
+
+                            # 检查价格合理性（债券通常在90-110元之间）
+                            if 50 < price < 200:
+                                logger.info(f"19789 从API获取价格: {price:.4f} (原始值: {raw_price})")
+                                return price
+                            else:
+                                logger.warning(f"19789 API返回价格异常: {price:.4f} (原始值: {raw_price})，尝试其他方式")
                 except Exception as e:
                     logger.debug(f"API调用失败: {e}")
                     continue
