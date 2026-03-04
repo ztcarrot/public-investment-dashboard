@@ -790,26 +790,14 @@ def main():
     if 'show_numbers' not in st.session_state:
         st.session_state.show_numbers = False
 
-    # 初始化日期范围选择（从URL查询参数或session_state加载）
+    # 初始化日期范围选择
     if 'selected_date_range' not in st.session_state:
-        # 优先从URL查询参数加载
-        if 'date_range' in st.query_params:
-            st.session_state.selected_date_range = st.query_params['date_range']
-        else:
-            st.session_state.selected_date_range = "最近365天"
+        st.session_state.selected_date_range = "最近365天"
 
-    # 初始化自定义日期（从URL查询参数或session_state加载）
+    # 初始化自定义日期
     if 'custom_start_date' not in st.session_state:
-        # 优先从URL查询参数加载
-        if 'custom_date' in st.query_params:
-            try:
-                st.session_state.custom_start_date = datetime.strptime(st.query_params['custom_date'], '%Y-%m-%d').date()
-            except:
-                default_date_dt = datetime.now() - timedelta(days=365)
-                st.session_state.custom_start_date = default_date_dt.date()
-        elif st.session_state.get('selected_date_range') == '自定义日期':
-            default_date_dt = datetime.now() - timedelta(days=365)
-            st.session_state.custom_start_date = default_date_dt.date()
+        default_date_dt = datetime.now() - timedelta(days=365)
+        st.session_state.custom_start_date = default_date_dt.date()
 
     # 侧边栏页面导航
     with st.sidebar:
@@ -884,30 +872,17 @@ def main():
             index=current_index
         )
 
-        # 如果用户改变了选择，更新session_state和URL查询参数
+        # 如果用户改变了选择，更新session_state
         if date_range != st.session_state.selected_date_range:
             st.session_state.selected_date_range = date_range
-            # 保存到URL查询参数（持久化）
-            st.query_params['date_range'] = date_range
-            # 如果不是自定义日期，清除自定义日期参数
-            if date_range != "自定义日期" and 'custom_date' in st.query_params:
-                del st.query_params['custom_date']
 
         # 如果选择自定义，显示日期选择器
         custom_days = None
         if date_range == "自定义日期":
             # 初始化自定义日期
             if 'custom_start_date' not in st.session_state:
-                # 优先从URL查询参数加载
-                if 'custom_date' in st.query_params:
-                    try:
-                        st.session_state.custom_start_date = datetime.strptime(st.query_params['custom_date'], '%Y-%m-%d').date()
-                    except:
-                        default_date_dt = datetime.now() - timedelta(days=365)
-                        st.session_state.custom_start_date = default_date_dt.date()
-                else:
-                    default_date_dt = datetime.now() - timedelta(days=365)
-                    st.session_state.custom_start_date = default_date_dt.date()
+                default_date_dt = datetime.now() - timedelta(days=365)
+                st.session_state.custom_start_date = default_date_dt.date()
 
             # 确保是date类型
             saved_date = st.session_state.custom_start_date
@@ -915,23 +890,13 @@ def main():
                 saved_date = saved_date.date()
                 st.session_state.custom_start_date = saved_date
 
-            # 日期选择器（不使用key，直接通过返回值获取用户输入）
+            # 日期选择器
             custom_start_date = st.date_input(
                 "选择开始日期",
                 value=saved_date,
-                max_value=datetime.now().date()
+                max_value=datetime.now().date(),
+                key="custom_date_input"
             )
-
-            # 如果用户改变了日期，更新session_state和保存到URL
-            if custom_start_date != saved_date:
-                st.session_state.custom_start_date = custom_start_date
-                # 保存到URL查询参数（持久化）
-                date_str = custom_start_date.strftime('%Y-%m-%d')
-                st.query_params['custom_date'] = date_str
-                st.rerun()
-
-            # 显示当前值
-            st.caption(f"💾 选择: {custom_start_date} (已保存到URL)")
 
             # 计算天数
             days_diff = (datetime.now().date() - custom_start_date).days
