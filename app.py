@@ -573,16 +573,15 @@ def main():
         page = st.radio(
             "选择页面",
             options=["📊 数据看板", "⚙️ 配置管理"],
-            index=0 if st.session_state.current_page == 'dashboard' else 1,
+            index=0 if st.session_state.get('current_page') == 'dashboard' else 1,
             key="page_navigation"
         )
 
-        # 更新当前页面
+        # 更新当前页面状态
         if page == "📊 数据看板":
             st.session_state.current_page = 'dashboard'
-        else:
+        elif page == "⚙️ 配置管理":
             st.session_state.current_page = 'config'
-            st.rerun()
 
     # 根据选择的页面显示不同内容
     if st.session_state.current_page == 'config':
