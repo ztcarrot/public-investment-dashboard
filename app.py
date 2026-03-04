@@ -665,14 +665,6 @@ def render_config_manager():
         else:
             st.warning("⚠️ 未从首页数据获取到价格信息，请返回首页刷新数据")
 
-    # 调试信息
-    if st.checkbox("显示调试信息"):
-        st.write("### 调试信息")
-        st.write(f"资产数量: {len(assets)}")
-        st.write(f"价格缓存: {st.session_state.get('current_price_cache', {})}")
-        for idx, asset in enumerate(assets):
-            st.write(f"{idx+1}. {asset['名称']} ({asset['代码']}) - 份额: {asset.get('初始份额', 0)}")
-
     # 显示资产列表
     for idx, asset in enumerate(assets):
         shares = asset.get('初始份额', 0)
