@@ -25,7 +25,7 @@ st.set_page_config(
     page_title="投资组合仪表盘",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 
