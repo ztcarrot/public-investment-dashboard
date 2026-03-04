@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LocalStorage Component</title>
+    <script src="https://cdn.jsdelivr.net/npm/@streamlit/streamlit@latest/dist/streamlit.js"></script>
+</head>
+<body>
+    <script>
+        // 监听来自 Streamlit 的消息
+        window.addEventListener('message', function(event) {
+            const { type, key, value, get } = event.data;
+
+            if (type === 'render') {
+                // 执行 localStorage 操作
+                let result = null;
+
+                if (get) {
+                    // 从 localStorage 读取
+                    try {
+                        result = localStorage.getItem(key);
+                    } catch (e) {
+                        result = null;
+                    }
+                } else {
+                    // 写入 localStorage
+                    try {
+                        localStorage.setItem(key, value);
+                    } catch (e) {
+                        console.error('LocalStorage save error:', e);
+                    }
+                }
+
+                // 返回结果到 Streamlit
+                window.parent.postMessage({
+                    type: 'streamlit:render',
+                    value: result
+                }, '*');
+            }
+        });
+
+        // 初始化完成
+        window.parent.postMessage({
+            type: 'streamlit:componentReady',
+            apiVersion: 1
+        }, '*');
+    </script>
+</body>
+</html>
