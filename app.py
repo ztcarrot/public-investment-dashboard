@@ -123,6 +123,44 @@ def render_total_assets_chart(portfolio_data):
 
     fig = go.Figure()
 
+    # 计算统计指标
+    total_assets = portfolio_data['总资产']
+    max_value = total_assets.max()
+    min_value = total_assets.min()
+    first_value = total_assets.iloc[0]
+    last_value = total_assets.iloc[-1]
+
+    max_idx = total_assets.idxmax()
+    min_idx = total_assets.idxmin()
+
+    max_date = portfolio_data.loc[max_idx, '日期']
+    min_date = portfolio_data.loc[min_idx, '日期']
+    first_date = portfolio_data.iloc[0]['日期']
+    last_date = portfolio_data.iloc[-1]['日期']
+
+    # 计算最大回撤
+    max_drawdown = 0
+    max_drawdown_start = None
+    max_drawdown_end = None
+    peak_value = first_value
+    peak_idx = 0
+
+    for i in range(1, len(portfolio_data)):
+        current_value = total_assets.iloc[i]
+        # 更新峰值
+        if current_value > peak_value:
+            peak_value = current_value
+            peak_idx = i
+
+        # 计算从峰值的回撤
+        drawdown = (peak_value - current_value) / peak_value if peak_value > 0 else 0
+
+        # 更新最大回撤
+        if drawdown > max_drawdown:
+            max_drawdown = drawdown
+            max_drawdown_start = portfolio_data.iloc[peak_idx]['日期']
+            max_drawdown_end = portfolio_data.iloc[i]['日期']
+
     # 添加总资产折线
     fig.add_trace(go.Scatter(
         x=portfolio_data['日期'],
@@ -152,16 +190,126 @@ def render_total_assets_chart(portfolio_data):
             hovertemplate='趋势: ¥%{y:,.2f}<extra></extra>'
         ))
 
+    # 添加关键点标记
+    # 初值
+    fig.add_trace(go.Scatter(
+        x=[first_date],
+        y=[first_value],
+        mode='markers+text',
+        name='初值',
+        marker=dict(color='green', size=12, symbol='circle'),
+        text=[f'初值: ¥{first_value:,.0f}'],
+        textposition='top center',
+        hovertemplate=f'%{{x}}<br>初值: ¥{first_value:,.2f}<extra></extra>'
+    ))
+
+    # 末值
+    fig.add_trace(go.Scatter(
+        x=[last_date],
+        y=[last_value],
+        mode='markers+text',
+        name='末值',
+        marker=dict(color='blue', size=12, symbol='circle'),
+        text=[f'末值: ¥{last_value:,.0f}'],
+        textposition='top center',
+        hovertemplate=f'%{{x}}<br>末值: ¥{last_value:,.2f}<extra></extra>'
+    ))
+
+    # 最大值
+    fig.add_trace(go.Scatter(
+        x=[max_date],
+        y=[max_value],
+        mode='markers+text',
+        name='最大值',
+        marker=dict(color='red', size=15, symbol='star'),
+        text=[f'最大值: ¥{max_value:,.0f}'],
+        textposition='top center',
+        hovertemplate=f'%{{x}}<br>最大值: ¥{max_value:,.2f}<extra></extra>'
+    ))
+
+    # 最小值
+    fig.add_trace(go.Scatter(
+        x=[min_date],
+        y=[min_value],
+        mode='markers+text',
+        name='最小值',
+        marker=dict(color='orange', size=15, symbol='star'),
+        text=[f'最小值: ¥{min_value:,.0f}'],
+        textposition='bottom center',
+        hovertemplate=f'%{{x}}<br>最小值: ¥{min_value:,.2f}<extra></extra>'
+    ))
+
+    # 添加最大回撤矩形标注
+    if max_drawdown > 0 and max_drawdown_start and max_drawdown_end:
+        # 找到回撤开始和结束的索引
+        start_idx = portfolio_data[portfolio_data['日期'] == max_drawdown_start].index[0]
+        end_idx = portfolio_data[portfolio_data['日期'] == max_drawdown_end].index[0]
+
+        # 获取回撤期间的数据
+        drawdown_data = portfolio_data.loc[start_idx:end_idx]
+
+        # 添加矩形标注
+        fig.add_vrect(
+            x0=max_drawdown_start,
+            x1=max_drawdown_end,
+            fillcolor="rgba(255, 0, 0, 0.2)",
+            layer="below",
+            line_width=0,
+            annotation_text=f"最大回撤: {max_drawdown*100:.2f}%",
+            annotation_position="top left",
+            annotation_font_size=12,
+            annotation_font_color="red"
+        )
+
     fig.update_layout(
-        title="总资产走势",
+        title="总资产走势（含最大回撤区间）",
         xaxis_title="日期",
         yaxis_title="总资产（元）",
         hovermode='x unified',
         template='plotly_white',
-        height=500
+        height=500,
+        showlegend=True
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
+    # 显示统计信息
+    st.markdown("### 📊 统计摘要")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric(
+            label="📈 最大值",
+            value=f"¥{max_value:,.2f}",
+            help=f"日期: {max_date.strftime('%Y-%m-%d')}"
+        )
+
+    with col2:
+        st.metric(
+            label="📉 最小值",
+            value=f"¥{min_value:,.2f}",
+            help=f"日期: {min_date.strftime('%Y-%m-%d')}"
+        )
+
+    with col3:
+        first_change = ((last_value - first_value) / first_value * 100) if first_value > 0 else 0
+        st.metric(
+            label="➡️ 初值→末值",
+            value=f"¥{first_value:,.2f} → ¥{last_value:,.2f}",
+            delta=f"{first_change:+.2f}%",
+            help=f"从 {first_date.strftime('%Y-%m-%d')} 到 {last_date.strftime('%Y-%m-%d')}"
+        )
+
+    with col4:
+        st.metric(
+            label="📊 最大回撤",
+            value=f"{max_drawdown*100:.2f}%",
+            delta=f"从 ¥{max_value:,.2f} 回落",
+            help=f"回撤区间: {max_drawdown_start.strftime('%Y-%m-%d') if max_drawdown_start else 'N/A'} → {max_drawdown_end.strftime('%Y-%m-%d') if max_drawdown_end else 'N/A'}"
+        )
+
+    st.markdown("---")
 
 
 def render_allocation_chart(portfolio_data):
