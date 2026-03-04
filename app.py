@@ -808,14 +808,43 @@ def main():
     if 'show_numbers' not in st.session_state:
         st.session_state.show_numbers = False
 
-    # 初始化日期范围选择（只在第一次运行时）
+    # 初始化日期范围选择（从文件或默认值）
     if 'selected_date_range' not in st.session_state:
         st.session_state.selected_date_range = "最近365天"
+        # 尝试从文件恢复
+        try:
+            import os
+            config_file = 'date_config.json'
+            if os.path.exists(config_file):
+                with open(config_file, 'r') as f:
+                    config = json.load(f)
+                    if 'selected_date_range' in config:
+                        st.session_state.selected_date_range = config['selected_date_range']
+                        st.info(f"✅ 已恢复上次的设置: {config['selected_date_range']}")
+                    if 'custom_start_date' in config:
+                        from datetime import datetime
+                        st.session_state.custom_start_date = datetime.strptime(config['custom_start_date'], '%Y-%m-%d').date()
+        except Exception as e:
+            logger.debug(f"从文件恢复配置失败: {e}")
 
-    # 初始化自定义日期（如果不存在）
+    # 初始化自定义日期
     if 'custom_start_date' not in st.session_state and st.session_state.get('selected_date_range') == '自定义日期':
         default_date = datetime.now() - timedelta(days=365)
         st.session_state.custom_start_date = default_date.date()
+
+    # 保存配置到文件的函数
+    def save_date_config(date_range, custom_date=None):
+        try:
+            config = {'selected_date_range': date_range}
+            if custom_date:
+                config['custom_start_date'] = custom_date.strftime('%Y-%m-%d')
+            with open('date_config.json', 'w') as f:
+                json.dump(config, f)
+        except Exception as e:
+            logger.error(f"保存配置失败: {e}")
+
+    # 将函数保存到 session_state 供后续使用
+    st.session_state.save_date_config = save_date_config
 
     # 侧边栏页面导航
     with st.sidebar:
@@ -890,9 +919,11 @@ def main():
             index=current_index
         )
 
-        # 如果用户改变了选择，更新session_state
+        # 如果用户改变了选择，更新session_state并保存
         if date_range != st.session_state.selected_date_range:
             st.session_state.selected_date_range = date_range
+            # 保存到文件
+            st.session_state.save_date_config(date_range)
 
         # 如果选择自定义，显示日期选择器
         custom_days = None
@@ -911,7 +942,8 @@ def main():
             # 日期选择器（使用key确保状态正确管理）
             def update_custom_date():
                 st.session_state.custom_start_date = st.session_state.temp_custom_date
-                logger.info(f"回调更新日期: {st.session_state.temp_custom_date}")
+                # 保存到文件
+                st.session_state.save_date_config(st.session_state.selected_date_range, st.session_state.custom_start_date)
 
             custom_start_date = st.date_input(
                 "选择开始日期",
@@ -922,7 +954,7 @@ def main():
             )
 
             # 显示当前值和保存的值
-            st.caption(f"选择: {custom_start_date} | 💾 已保存: {st.session_state.custom_start_date}")
+            st.caption(f"选择: {custom_start_date} | 💾 已保存到文件")
 
             # 计算天数
             days_diff = (datetime.now().date() - custom_start_date).days
