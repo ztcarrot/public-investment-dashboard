@@ -152,6 +152,68 @@ class DataFetcher:
             logger.error(f"获取股票 {stock_code} 历史数据出错: {e}")
             return []
 
+    def get_stock_historical_from_eastmoney(self, stock_code: str, start_date: str, end_date: str) -> List[Dict]:
+        """
+        从东方财富获取股票历史数据
+
+        Args:
+            stock_code: 股票代码
+            start_date: 开始日期 (YYYY-MM-DD)
+            end_date: 结束日期 (YYYY-MM-DD)
+
+        Returns:
+            历史数据列表
+        """
+        try:
+            if len(stock_code) != 6:
+                return []
+
+            # 判断市场：5/6/11开头→上海市场(secid=1.xxx)，其他→深圳市场(secid=0.xxx)
+            if stock_code.startswith('5') or stock_code.startswith('6') or stock_code.startswith('11'):
+                secid = f"1.{stock_code}"
+            else:
+                secid = f"0.{stock_code}"
+
+            # 东方财富K线API
+            url = f"http://push2.eastmoney.com/api/qt/stock/kline/get?secid={secid}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=101&fqt=0&beg={start_date.replace('-', '')}&end={end_date.replace('-', '')}"
+
+            response = requests.get(url, headers=self.headers, timeout=15)
+
+            if response.status_code != 200:
+                logger.warning(f"获取股票 {stock_code} 数据失败: HTTP {response.status_code}")
+                return []
+
+            import json
+            data = response.json()
+
+            if not data.get('data') or not data['data'].get('klines'):
+                return []
+
+            klines = data['data']['klines']
+            result = []
+
+            for kline in klines:
+                # K线数据格式：日期,开盘,收盘,最高,最低,成交量...
+                parts = kline.split(',')
+                if len(parts) >= 3:
+                    date_str = parts[0]
+                    close_price = parts[2]  # 收盘价在第3个位置（索引2）
+
+                    if close_price:
+                        result.append({
+                            '日期': date_str,
+                            '净值': float(close_price)
+                        })
+
+            if result:
+                logger.info(f"股票 {stock_code} 获取到 {len(result)} 条历史数据")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"获取股票 {stock_code} 历史数据出错: {e}")
+            return []
+
     def get_bond_19789_historical(self, start_date: str, end_date: str) -> List[Dict]:
         """
         获取25特国06(19789)的历史数据
@@ -281,12 +343,21 @@ class DataFetcher:
         # 特殊处理19789（25特国06）
         if code == '19789' or code == '019789':
             history = self.get_bond_19789_historical(start_date, end_date)
-        elif code_type == '基金':
+        elif code_type == '场内ETF' or code_type == '基金':
+            # 场内ETF和基金 → 东方财富基金API
             # 对于基金代码，如果是5位或更少，补齐到6位（东方财富API要求）
             fetch_code = code.zfill(6) if len(code) < 6 else code
             history = self.get_fund_historical_from_eastmoney(fetch_code, start_date, end_date)
+        elif code_type == '股票':
+            # 股票 → 东方财富股票API
+            history = self.get_stock_historical_from_eastmoney(code, start_date, end_date)
+        elif code_type == '债券':
+            # 债券 → 债券API
+            history = self.get_bond_19789_historical(start_date, end_date)
         else:
-            history = self.get_stock_historical_from_sina(code, start_date, end_date)
+            # 默认使用东方财富基金API
+            fetch_code = code.zfill(6) if len(code) < 6 else code
+            history = self.get_fund_historical_from_eastmoney(fetch_code, start_date, end_date)
 
         if not history:
             logger.warning(f"未获取到 {code}({name}) 的数据")
