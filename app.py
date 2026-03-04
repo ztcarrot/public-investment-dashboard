@@ -388,7 +388,8 @@ def render_config_manager():
                     # 验证每个资产配置
                     valid_assets = []
                     for asset in json_data:
-                        if validate_asset(asset):
+                        is_valid, error_msg = validate_asset(asset)
+                        if is_valid:
                             valid_assets.append(asset)
                     if valid_assets:
                         st.session_state.assets = valid_assets
@@ -404,10 +405,20 @@ def render_config_manager():
 
     with col4:
         if st.button("🔄 重置默认", type="secondary"):
-            if st.confirm("⚠️ 确定要恢复默认配置吗？当前配置将被覆盖"):
+            # 使用确认对话框
+            if 'confirm_reset' not in st.session_state:
+                st.session_state.confirm_reset = False
+
+            if not st.session_state.confirm_reset:
+                st.warning("⚠️ 点击再次确认以恢复默认配置")
+                if st.button("确认重置", key="confirm_reset_btn"):
+                    st.session_state.confirm_reset = True
+                    st.rerun()
+            else:
                 default_assets = get_default_assets()
                 st.session_state.assets = default_assets
                 save_to_session('investment_assets', default_assets)
+                st.session_state.confirm_reset = False
                 st.success("✅ 已恢复默认配置")
                 st.rerun()
 
@@ -496,7 +507,8 @@ def render_config_manager():
 
             for idx, row in df_to_save.iterrows():
                 asset = row.to_dict()
-                if validate_asset(asset):
+                is_valid, error_msg = validate_asset(asset)
+                if is_valid:
                     valid_assets.append(asset)
                 else:
                     errors.append(f"第 {idx + 1} 行：{asset.get('代码', '未知代码')}")

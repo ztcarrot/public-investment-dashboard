@@ -82,7 +82,7 @@ def parse_secrets_assets(assets_data: List[Dict]) -> List[Dict[str, Union[str, f
     return parsed_assets
 
 
-def validate_asset(asset: Dict) -> Dict[str, Union[str, float, None]]:
+def validate_asset(asset: Dict) -> tuple[bool, str]:
     """
     验证单个资产配置的有效性。
 
@@ -96,66 +96,67 @@ def validate_asset(asset: Dict) -> Dict[str, Union[str, float, None]]:
         asset: 待验证的资产配置字典
 
     Returns:
-        验证通过后的资产配置字典
-
-    Raises:
-        ValueError: 如果资产配置不符合验证规则
+        (is_valid, error_message 或 '')
+        is_valid: 验证是否通过
+        error_message: 错误信息，验证通过时为空字符串
     """
-    # 检查必需字段
-    required_fields = ['代码', '名称', '代码类型', '资产类别']
-    for field in required_fields:
-        if field not in asset:
-            raise ValueError(f"缺少必需字段: {field}")
+    try:
+        # 检查必需字段
+        required_fields = ['代码', '名称', '代码类型', '资产类别']
+        for field in required_fields:
+            if field not in asset:
+                return False, f"缺少必需字段: {field}"
 
-    # 验证代码和名称不为空
-    if not asset['代码'] or not isinstance(asset['代码'], str) or not asset['代码'].strip():
-        raise ValueError("代码不能为空")
+        # 验证代码和名称不为空
+        if not asset['代码'] or not isinstance(asset['代码'], str) or not asset['代码'].strip():
+            return False, "代码不能为空"
 
-    if not asset['名称'] or not isinstance(asset['名称'], str) or not asset['名称'].strip():
-        raise ValueError("名称不能为空")
+        if not asset['名称'] or not isinstance(asset['名称'], str) or not asset['名称'].strip():
+            return False, "名称不能为空"
 
-    # 验证代码类型
-    valid_code_types = ['场内ETF', '基金', '股票', '债券']
-    if asset['代码类型'] not in valid_code_types:
-        raise ValueError(f"代码类型必须是以下之一: {', '.join(valid_code_types)}")
+        # 验证代码类型
+        valid_code_types = ['场内ETF', '基金', '股票', '债券']
+        if asset['代码类型'] not in valid_code_types:
+            return False, f"代码类型必须是以下之一: {', '.join(valid_code_types)}"
 
-    # 验证资产类别
-    valid_asset_categories = ['国债', '股票', '黄金', '现金']
-    if asset['资产类别'] not in valid_asset_categories:
-        raise ValueError(f"资产类别必须是以下之一: {', '.join(valid_asset_categories)}")
+        # 验证资产类别
+        valid_asset_categories = ['国债', '股票', '黄金', '现金']
+        if asset['资产类别'] not in valid_asset_categories:
+            return False, f"资产类别必须是以下之一: {', '.join(valid_asset_categories)}"
 
-    # 验证初始份额和初始金额的互斥性
-    initial_shares = asset.get('初始份额')
-    initial_amount = asset.get('初始金额')
+        # 验证初始份额和初始金额的互斥性
+        initial_shares = asset.get('初始份额')
+        initial_amount = asset.get('初始金额')
 
-    # 如果两个都为 None，则设置初始份额为 0.0
-    if initial_shares is None and initial_amount is None:
-        asset['初始份额'] = 0.0
-        asset['初始金额'] = None
-    # 如果两个都有值，则报错
-    elif initial_shares is not None and initial_amount is not None:
-        raise ValueError("初始份额和初始金额只能输入其中一个")
-    # 如果有值，验证是否为正数
-    elif initial_shares is not None:
-        try:
-            shares = float(initial_shares)
-            if shares < 0:
-                raise ValueError("初始份额不能为负数")
-            asset['初始份额'] = shares
-            asset['初始金额'] = None
-        except (TypeError, ValueError):
-            raise ValueError("初始份额必须是有效的数字")
-    elif initial_amount is not None:
-        try:
-            amount = float(initial_amount)
-            if amount < 0:
-                raise ValueError("初始金额不能为负数")
-            asset['初始份额'] = None
-            asset['初始金额'] = amount
-        except (TypeError, ValueError):
-            raise ValueError("初始金额必须是有效的数字")
+        # 如果两个都为 None 或 0
+        if (initial_shares is None or initial_shares == 0) and (initial_amount is None or initial_amount == 0):
+            return False, "初始份额和初始金额必须输入其中一个"
 
-    return asset
+        # 如果两个都有值，则报错
+        if initial_shares is not None and initial_amount is not None and initial_shares > 0 and initial_amount > 0:
+            return False, "初始份额和初始金额只能输入其中一个"
+
+        # 验证数值
+        if initial_shares is not None and initial_shares > 0:
+            try:
+                shares = float(initial_shares)
+                if shares < 0:
+                    return False, "初始份额不能为负数"
+            except (TypeError, ValueError):
+                return False, "初始份额必须是有效的数字"
+
+        if initial_amount is not None and initial_amount > 0:
+            try:
+                amount = float(initial_amount)
+                if amount < 0:
+                    return False, "初始金额不能为负数"
+            except (TypeError, ValueError):
+                return False, "初始金额必须是有效的数字"
+
+        return True, ""
+
+    except Exception as e:
+        return False, f"验证出错: {str(e)}"
 
 
 def calculate_shares_or_amount(asset: Dict, current_price: float) -> Dict[str, float]:
