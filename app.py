@@ -435,24 +435,14 @@ def render_config_manager():
 
     with col4:
         if st.button("🔄 使用默认配置", type="secondary"):
-            if 'confirm_reset' not in st.session_state:
-                st.session_state.confirm_reset = False
-
-            if not st.session_state.confirm_reset:
-                st.warning("⚠️ 将切换到默认的4个资产配置，当前配置将被覆盖")
-                if st.button("确认切换", key="confirm_reset_btn"):
-                    st.session_state.confirm_reset = True
-                    st.rerun()
-            else:
-                default_assets = get_default_assets()
-                st.session_state.assets = default_assets
-                save_to_session('investment_assets', default_assets)
-                st.session_state.confirm_reset = False
-                # 清除缓存并跳转到首页
-                st.cache_data.clear()
-                st.session_state.current_page = 'dashboard'
-                st.success("✅ 已切换到默认配置（4个资产）")
-                st.rerun()
+            default_assets = get_default_assets()
+            st.session_state.assets = default_assets
+            save_to_session('investment_assets', default_assets)
+            # 清除缓存并跳转到首页
+            st.cache_data.clear()
+            st.session_state.current_page = 'dashboard'
+            st.success("✅ 已切换到默认配置（4个资产）")
+            st.rerun()
 
     st.markdown("---")
 
