@@ -391,178 +391,184 @@ def render_config_manager():
     st.title("⚙️ 配置管理")
     st.markdown("---")
 
-    # 添加/编辑资产表单
+    # 添加/编辑资产表单（弹窗形式）
     if st.session_state.get('show_add_form', False):
-        # 如果需要滚动到表单
-        if st.session_state.get('scroll_to_form', False):
-            st.components.v1.html("""
-            <script>
-                setTimeout(function() {
-                    const element = document.getElementById('asset-form-anchor');
-                    if (element) {
-                        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }
-                }, 100);
-            </script>
-            """, height=0)
-            st.session_state.scroll_to_form = False
+        editing_index = st.session_state.get('editing_index')
+        is_edit = editing_index is not None
 
-        # 使用容器突出显示表单
-        with st.container():
-            # 添加锚点用于JavaScript滚动
-            st.markdown('<div id="asset-form-anchor"></div>', unsafe_allow_html=True)
+        if is_edit:
+            assets = st.session_state.get('assets', [])
+            current_asset = assets[editing_index]
+            title = f"✏️ 编辑资产：{current_asset.get('名称', '未知')}"
+        else:
+            current_asset = {}
+            title = "➕ 添加新资产"
 
-            st.markdown("### 📝 添加/编辑资产")
+        # 使用expander作为弹窗
+        with st.expander(title, expanded=True):
+            # 表单内容
+            with st.form(key="asset_form"):
+                col_form1, col_form2 = st.columns(2)
 
-            # 关闭表单按钮
-            if st.button("❌ 关闭表单", key="close_form"):
-                st.session_state.show_add_form = False
-                st.session_state.editing_index = None
-                st.rerun()
+                with col_form1:
+                    code = st.text_input(
+                        "代码 *",
+                        value=current_asset.get('代码', ''),
+                        help="6位代码，如：511130"
+                    ).strip()
 
-            st.markdown("---")
+                    name = st.text_input(
+                        "名称 *",
+                        value=current_asset.get('名称', ''),
+                        help="资产名称"
+                    ).strip()
 
-            # 表单
-            editing_index = st.session_state.get('editing_index')
-            is_edit = editing_index is not None
+                    code_type = st.selectbox(
+                        "代码类型 *",
+                        options=['场内ETF', '基金', '股票', '债券'],
+                        index=['场内ETF', '基金', '股票', '债券'].index(current_asset.get('代码类型', '场内ETF')),
+                        help="选择代码类型",
+                        key="form_code_type"
+                    )
 
-            if is_edit:
-                assets = st.session_state.get('assets', [])
-                current_asset = assets[editing_index]
-                st.info(f"✏️ 正在编辑：{current_asset.get('名称', '未知')}")
-            else:
-                current_asset = {}
-                st.info("💡 请填写下方表单添加新资产")
+                    # 保存到session_state供计算器使用
+                    if code:
+                        st.session_state.temp_code = code
+                    if name:
+                        st.session_state.temp_name = name
+                    st.session_state.temp_code_type = code_type
 
-        with st.form(key="asset_form"):
-            col_form1, col_form2 = st.columns(2)
+                with col_form2:
+                    asset_category = st.selectbox(
+                        "资产类别 *",
+                        options=['国债', '股票', '黄金', '现金'],
+                        index=['国债', '股票', '黄金', '现金'].index(current_asset.get('资产类别', '股票')),
+                        help="选择资产类别",
+                        key="form_asset_category"
+                    )
 
-            with col_form1:
-                code = st.text_input(
-                    "代码 *",
-                    value=current_asset.get('代码', ''),
-                    help="6位代码，如：511130"
-                ).strip()
+                    # 持有份额输入
+                    st.markdown("**持有信息**")
+                    st.caption("输入持有份额")
 
-                name = st.text_input(
-                    "名称 *",
-                    value=current_asset.get('名称', ''),
-                    help="资产名称"
-                ).strip()
+                    # 获取当前价格（用于显示）
+                    current_price = None
+                    if code and len(code) == 6:
+                        if 'current_price_cache' not in st.session_state:
+                            st.session_state.current_price_cache = {}
 
-                code_type = st.selectbox(
-                    "代码类型 *",
-                    options=['场内ETF', '基金', '股票', '债券'],
-                    index=['场内ETF', '基金', '股票', '债券'].index(current_asset.get('代码类型', '场内ETF')),
-                    help="选择代码类型",
-                    key="form_code_type"
-                )
+                        cache_key = f"{code}_{code_type}"
+                        if cache_key not in st.session_state.current_price_cache:
+                            with st.spinner(f"正在获取 {code} 的当前价格..."):
+                                try:
+                                    fetcher = DataFetcher()
+                                    end = datetime.now().strftime('%Y-%m-%d')
+                                    start = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
 
-                # 保存到session_state供计算器使用
-                if code:
-                    st.session_state.temp_code = code
-                if name:
-                    st.session_state.temp_name = name
-                st.session_state.temp_code_type = code_type
+                                    temp_asset = {
+                                        '代码': code,
+                                        '代码类型': code_type,
+                                        '初始份额': 1.0
+                                    }
+                                    history = fetcher.fetch_asset_data(temp_asset, start, end)
+                                    if not history.empty and '净值' in history.columns:
+                                        current_price = history['净值'].iloc[-1]
+                                        st.session_state.current_price_cache[cache_key] = current_price
+                                except Exception as e:
+                                    st.warning(f"⚠️ 无法获取价格: {str(e)}")
+                        else:
+                            current_price = st.session_state.current_price_cache.get(cache_key)
 
-            with col_form2:
-                asset_category = st.selectbox(
-                    "资产类别 *",
-                    options=['国债', '股票', '黄金', '现金'],
-                    index=['国债', '股票', '黄金', '现金'].index(current_asset.get('资产类别', '股票')),
-                    help="选择资产类别",
-                    key="form_asset_category"
-                )
+                    shares = st.number_input(
+                        "持有份额 *",
+                        min_value=0.0,
+                        step=100.0,
+                        value=float(current_asset.get('初始份额', 0) if current_asset.get('初始份额') else 0.0),
+                        format="%.2f",
+                        help="输入持有份额",
+                        key="form_shares"
+                    )
 
-                # 持有份额输入
-                st.markdown("**持有信息**")
-                st.caption("输入持有份额")
-
-                # 获取当前价格（用于显示）
-                current_price = None
-                if code and len(code) == 6:
-                    if 'current_price_cache' not in st.session_state:
-                        st.session_state.current_price_cache = {}
-
-                    cache_key = f"{code}_{code_type}"
-                    if cache_key not in st.session_state.current_price_cache:
-                        with st.spinner(f"正在获取 {code} 的当前价格..."):
-                            try:
-                                fetcher = DataFetcher()
-                                end = datetime.now().strftime('%Y-%m-%d')
-                                start = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-
-                                temp_asset = {
-                                    '代码': code,
-                                    '代码类型': code_type,
-                                    '初始份额': 1.0
-                                }
-                                history = fetcher.fetch_asset_data(temp_asset, start, end)
-                                if not history.empty and '净值' in history.columns:
-                                    current_price = history['净值'].iloc[-1]
-                                    st.session_state.current_price_cache[cache_key] = current_price
-                            except Exception as e:
-                                st.warning(f"⚠️ 无法获取价格: {str(e)}")
+                    # 显示当前价格和预估市值
+                    if current_price:
+                        if shares and shares > 0:
+                            estimated_value = current_price * shares
+                            st.info(f"💰 当前价格: ¥{current_price:.4f} | 预估市值: ¥{estimated_value:,.2f}")
+                        else:
+                            st.info(f"💰 当前价格: ¥{current_price:.4f}")
                     else:
-                        current_price = st.session_state.current_price_cache.get(cache_key)
+                        st.caption("💡 输入代码后自动获取当前价格")
 
-                shares = st.number_input(
-                    "持有份额 *",
-                    min_value=0.0,
-                    step=100.0,
-                    value=float(current_asset.get('初始份额', 0) if current_asset.get('初始份额') else 0.0),
-                    format="%.2f",
-                    help="输入持有份额",
-                    key="form_shares"
-                )
+                col_submit1, col_submit2, col_submit3 = st.columns(3)
 
-                # 显示当前价格和预估市值
-                if current_price:
-                    if shares and shares > 0:
-                        estimated_value = current_price * shares
-                        st.info(f"💰 当前价格: ¥{current_price:.4f} | 预估市值: ¥{estimated_value:,.2f}")
-                    else:
-                        st.info(f"💰 当前价格: ¥{current_price:.4f}")
-                else:
-                    st.caption("💡 输入代码后自动获取当前价格")
+                with col_submit1:
+                    submit = st.form_submit_button("💾 保存", use_container_width=True)
 
-            col_submit1, col_submit2, col_submit3 = st.columns(3)
+                with col_submit2:
+                    cancel = st.form_submit_button("❌ 取消", use_container_width=True)
 
-            with col_submit1:
-                submit = st.form_submit_button("💾 保存", use_container_width=True)
-
-            with col_submit2:
-                cancel = st.form_submit_button("❌ 取消", use_container_width=True)
-
-            with col_submit3:
-                if is_edit:
-                    delete = st.form_submit_button("🗑️ 删除", use_container_width=True)
-
-            if submit:
-                # 构建资产数据
-                asset = {
-                    '代码': code,
-                    '名称': name,
-                    '代码类型': code_type,
-                    '资产类别': asset_category,
-                    '初始份额': shares,
-                    '初始金额': None  # 统一使用份额，金额为None
-                }
-
-                # 验证
-                is_valid, error_msg = validate_asset(asset)
-                if not is_valid:
-                    st.error(f"❌ {error_msg}")
-                else:
-                    assets = st.session_state.get('assets', [])
-
+                with col_submit3:
                     if is_edit:
-                        assets[editing_index] = asset
-                        st.success(f"✅ 已更新资产：{name}")
-                    else:
-                        assets.append(asset)
-                        st.success(f"✅ 已添加资产：{name}")
+                        delete = st.form_submit_button("🗑️ 删除", use_container_width=True)
 
+                if submit:
+                    # 构建资产数据
+                    asset = {
+                        '代码': code,
+                        '名称': name,
+                        '代码类型': code_type,
+                        '资产类别': asset_category,
+                        '初始份额': shares,
+                        '初始金额': None
+                    }
+
+                    # 验证
+                    is_valid, error_msg = validate_asset(asset)
+                    if not is_valid:
+                        st.error(f"❌ {error_msg}")
+                    else:
+                        assets = st.session_state.get('assets', [])
+
+                        if is_edit:
+                            assets[editing_index] = asset
+                            st.success(f"✅ 已更新资产：{name}")
+                        else:
+                            assets.append(asset)
+                            st.success(f"✅ 已添加资产：{name}")
+
+                        st.session_state.assets = assets
+                        assets_config_manager.save(assets)
+                        st.session_state.show_add_form = False
+                        st.session_state.editing_index = None
+
+                        # 后台刷新数据（不跳转页面）
+                        with st.spinner("🔄 正在后台刷新数据..."):
+                            # 清除旧数据缓存
+                            keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
+                            for key in keys_to_remove:
+                                del st.session_state[key]
+
+                            # 重新加载数据
+                            start_date_str = st.session_state.start_date.strftime('%Y-%m-%d')
+                            historical_data, portfolio_data = load_data(start_date_str)
+
+                            if historical_data is not None and portfolio_data is not None:
+                                # 保存到session_state供配置页面使用
+                                st.session_state['historical_data'] = historical_data
+                                st.session_state['portfolio_data'] = portfolio_data
+                                st.success("✅ 数据已刷新，配置页面金额已更新")
+
+                        st.rerun()
+
+                if cancel:
+                    st.session_state.show_add_form = False
+                    st.session_state.editing_index = None
+                    st.rerun()
+
+                if is_edit and delete:
+                    assets = st.session_state.get('assets', [])
+                    deleted_name = assets[editing_index].get('名称', '未知')
+                    assets.pop(editing_index)
                     st.session_state.assets = assets
                     assets_config_manager.save(assets)
                     st.session_state.show_add_form = False
@@ -587,40 +593,7 @@ def render_config_manager():
 
                     st.rerun()
 
-            if cancel:
-                st.session_state.show_add_form = False
-                st.session_state.editing_index = None
-                st.rerun()
-
-            if is_edit and delete:
-                assets = st.session_state.get('assets', [])
-                deleted_name = assets[editing_index].get('名称', '未知')
-                assets.pop(editing_index)
-                st.session_state.assets = assets
-                assets_config_manager.save(assets)
-                st.session_state.show_add_form = False
-                st.session_state.editing_index = None
-
-                # 后台刷新数据（不跳转页面）
-                with st.spinner("🔄 正在后台刷新数据..."):
-                    # 清除旧数据缓存
-                    keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
-                    for key in keys_to_remove:
-                        del st.session_state[key]
-
-                    # 重新加载数据
-                    start_date_str = st.session_state.start_date.strftime('%Y-%m-%d')
-                    historical_data, portfolio_data = load_data(start_date_str)
-
-                    if historical_data is not None and portfolio_data is not None:
-                        # 保存到session_state供配置页面使用
-                        st.session_state['historical_data'] = historical_data
-                        st.session_state['portfolio_data'] = portfolio_data
-                        st.success("✅ 数据已刷新，配置页面金额已更新")
-
-                st.rerun()
-
-        st.markdown("---")
+    # 配置列表（只读显示，点击编辑）
 
     # 配置列表（只读显示，点击编辑）
     st.subheader("📋 资产配置列表")
