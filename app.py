@@ -391,112 +391,6 @@ def render_config_manager():
     st.title("⚙️ 配置管理")
     st.markdown("---")
 
-    # 操作按钮
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        if st.button("➕ 添加资产", type="primary"):
-            st.session_state.show_add_form = True
-            st.session_state.editing_index = None
-            st.rerun()
-
-    with col2:
-        if st.button("📤 导出配置", type="secondary"):
-            assets = st.session_state.get('assets', [])
-            if assets:
-                json_data = json.dumps(assets, ensure_ascii=False, indent=2)
-                st.download_button(
-                    label="下载配置文件",
-                    data=json_data,
-                    file_name=f"investment_config_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                    mime="application/json",
-                    use_container_width=True
-                )
-
-    with col3:
-        uploaded_file = st.file_uploader(
-            "📥 导入配置",
-            type=['json'],
-            label_visibility="collapsed",
-            key="config_upload"
-        )
-        if uploaded_file is not None:
-            try:
-                json_data = json.load(uploaded_file)
-                if isinstance(json_data, list):
-                    valid_assets = []
-                    for asset in json_data:
-                        is_valid, error_msg = validate_asset(asset)
-                        if is_valid:
-                            valid_assets.append(asset)
-                    if valid_assets:
-                        st.session_state.assets = valid_assets
-                        assets_config_manager.save(valid_assets)
-
-                        # 后台刷新数据
-                        with st.spinner("🔄 正在后台刷新数据..."):
-                            # 清除旧数据缓存
-                            keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
-                            for key in keys_to_remove:
-                                del st.session_state[key]
-
-                            # 重新加载数据
-                            start_date_str = st.session_state.start_date.strftime('%Y-%m-%d')
-                            historical_data, portfolio_data = load_data(start_date_str)
-
-                            if historical_data is not None and portfolio_data is not None:
-                                # 保存到session_state供配置页面使用
-                                st.session_state['historical_data'] = historical_data
-                                st.session_state['portfolio_data'] = portfolio_data
-
-                        st.success(f"✅ 成功导入 {len(valid_assets)} 个资产配置")
-                        st.rerun()
-                    else:
-                        st.error("❌ 导入的配置中没有有效的资产")
-                else:
-                    st.error("❌ 配置文件格式错误：应为资产列表")
-            except Exception as e:
-                st.error(f"❌ 导入配置失败: {str(e)}")
-
-    with col4:
-        if st.button("🔄 重置配置", type="secondary"):
-            # 清除session_state中的配置
-            if 'investment_assets' in st.session_state:
-                del st.session_state['investment_assets']
-            if 'assets' in st.session_state:
-                del st.session_state['assets']
-
-            # 重新加载配置（会按优先级：secrets → 默认）
-            assets = load_assets_config()
-            st.session_state.assets = assets
-            assets_config_manager.save(assets)
-
-            # 后台刷新数据
-            with st.spinner("🔄 正在后台刷新数据..."):
-                # 清除旧数据缓存
-                keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
-                for key in keys_to_remove:
-                    del st.session_state[key]
-
-                # 重新加载数据
-                start_date_str = st.session_state.start_date.strftime('%Y-%m-%d')
-                historical_data, portfolio_data = load_data(start_date_str)
-
-                if historical_data is not None and portfolio_data is not None:
-                    # 保存到session_state供配置页面使用
-                    st.session_state['historical_data'] = historical_data
-                    st.session_state['portfolio_data'] = portfolio_data
-
-            # 显示来源信息
-            if hasattr(st, 'secrets') and 'assets' in st.secrets:
-                st.success(f"✅ 已从 secrets.toml 重新加载配置（{len(assets)} 个资产）")
-            else:
-                st.success(f"✅ 已重置为默认配置（{len(assets)} 个资产）")
-
-            st.rerun()
-
-    st.markdown("---")
-
     # 添加/编辑资产表单
     if st.session_state.get('show_add_form', False):
         st.subheader("📝 添加/编辑资产")
@@ -701,21 +595,13 @@ def render_config_manager():
         st.markdown("---")
 
     # 配置列表（只读显示，点击编辑）
-    # 标题和刷新按钮
-    col_header, col_refresh = st.columns([5, 1])
-    with col_header:
-        st.subheader("📋 资产配置列表")
-    with col_refresh:
-        if st.button("🔄 返回首页刷新", key="back_to_dashboard_refresh", use_container_width=True):
-            st.session_state.current_page = 'dashboard'
-            st.session_state.page_selection = 0
-            st.cache_data.clear()
-            st.rerun()
+    st.subheader("📋 资产配置列表")
 
     assets = st.session_state.get('assets', [])
 
     if not assets:
-        st.warning("⚠️ 当前没有配置任何资产，点击上方「➕ 添加资产」开始")
+        st.warning("⚠️ 当前没有配置任何资产")
+        st.info("💡 请在下方点击「➕ 添加资产」开始配置，或从 secrets.toml 加载默认配置")
         return
 
     # 提示信息
@@ -791,6 +677,124 @@ def render_config_manager():
     st.markdown("---")
     st.caption(f"📊 当前配置：共 {len(assets)} 个资产")
     st.caption("💡 提示：点击资产左侧的 ▶ 展开详情，点击「编辑」按钮修改配置")
+
+    # 操作按钮区域
+    st.markdown("---")
+    st.subheader("🛠️ 配置操作")
+
+    # 第一行按钮
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("➕ 添加资产", type="primary", use_container_width=True):
+            st.session_state.show_add_form = True
+            st.session_state.editing_index = None
+            st.rerun()
+
+    with col2:
+        if st.button("🏠 返回首页", use_container_width=True):
+            st.session_state.current_page = 'dashboard'
+            st.session_state.page_selection = 0
+            st.rerun()
+
+    # 第二行按钮
+    col3, col4, col5 = st.columns(3)
+
+    with col3:
+        if st.button("📤 导出配置", use_container_width=True):
+            assets = st.session_state.get('assets', [])
+            if assets:
+                json_data = json.dumps(assets, ensure_ascii=False, indent=2)
+                st.download_button(
+                    label="⬇️ 下载配置文件",
+                    data=json_data,
+                    file_name=f"investment_config_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    mime="application/json",
+                    use_container_width=True
+                )
+
+    with col4:
+        uploaded_file = st.file_uploader(
+            "📥 导入配置",
+            type=['json'],
+            label_visibility="visible",
+            key="config_upload"
+        )
+        if uploaded_file is not None:
+            try:
+                json_data = json.load(uploaded_file)
+                if isinstance(json_data, list):
+                    valid_assets = []
+                    for asset in json_data:
+                        is_valid, error_msg = validate_asset(asset)
+                        if is_valid:
+                            valid_assets.append(asset)
+                    if valid_assets:
+                        st.session_state.assets = valid_assets
+                        assets_config_manager.save(valid_assets)
+
+                        # 后台刷新数据
+                        with st.spinner("🔄 正在后台刷新数据..."):
+                            # 清除旧数据缓存
+                            keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
+                            for key in keys_to_remove:
+                                del st.session_state[key]
+
+                            # 重新加载数据
+                            start_date_str = st.session_state.start_date.strftime('%Y-%m-%d')
+                            historical_data, portfolio_data = load_data(start_date_str)
+
+                            if historical_data is not None and portfolio_data is not None:
+                                # 保存到session_state供配置页面使用
+                                st.session_state['historical_data'] = historical_data
+                                st.session_state['portfolio_data'] = portfolio_data
+
+                        st.success(f"✅ 成功导入 {len(valid_assets)} 个资产配置")
+                        st.rerun()
+                    else:
+                        st.error("❌ 导入的配置中没有有效的资产")
+                else:
+                    st.error("❌ 配置文件格式错误：应为资产列表")
+            except Exception as e:
+                st.error(f"❌ 导入配置失败: {str(e)}")
+
+    with col5:
+        if st.button("🔄 重置配置", use_container_width=True):
+            # 清除session_state中的配置
+            if 'investment_assets' in st.session_state:
+                del st.session_state['investment_assets']
+            if 'assets' in st.session_state:
+                del st.session_state['assets']
+
+            # 重新加载配置（会按优先级：secrets → 默认）
+            assets = load_assets_config()
+            st.session_state.assets = assets
+            assets_config_manager.save(assets)
+
+            # 后台刷新数据
+            with st.spinner("🔄 正在后台刷新数据..."):
+                # 清除旧数据缓存
+                keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
+                for key in keys_to_remove:
+                    del st.session_state[key]
+
+                # 重新加载数据
+                start_date_str = st.session_state.start_date.strftime('%Y-%m-%d')
+                historical_data, portfolio_data = load_data(start_date_str)
+
+                if historical_data is not None and portfolio_data is not None:
+                    # 保存到session_state供配置页面使用
+                    st.session_state['historical_data'] = historical_data
+                    st.session_state['portfolio_data'] = portfolio_data
+
+            # 显示来源信息
+            if hasattr(st, 'secrets') and 'assets' in st.secrets:
+                st.success(f"✅ 已从 secrets.toml 重新加载配置（{len(assets)} 个资产）")
+            else:
+                st.success(f"✅ 已重置为默认配置（{len(assets)} 个资产）")
+
+            st.rerun()
+
 
 
 def load_assets_config():
