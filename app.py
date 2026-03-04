@@ -533,6 +533,13 @@ def render_config_manager():
                     key="form_code_type"
                 )
 
+                # 保存到session_state供计算器使用
+                if code:
+                    st.session_state.temp_code = code
+                if name:
+                    st.session_state.temp_name = name
+                st.session_state.temp_code_type = code_type
+
             with col_form2:
                 asset_category = st.selectbox(
                     "资产类别 *",
@@ -542,9 +549,12 @@ def render_config_manager():
                     key="form_asset_category"
                 )
 
+                # 保存到session_state供计算器使用
+                st.session_state.temp_asset_category = asset_category
+
                 # 持有份额输入
                 st.markdown("**持有信息**")
-                st.caption("输入持有份额，或使用下方的金额计算器")
+                st.caption("输入持有份额，或使用表单下方的「💰 金额计算器」按钮")
 
                 # 获取当前价格（用于显示）
                 current_price = None
@@ -575,41 +585,25 @@ def render_config_manager():
                     else:
                         current_price = st.session_state.current_price_cache.get(cache_key)
 
-                # 显示金额计算器入口
-                col_shares, col_calc = st.columns([3, 1])
+                # 显示金额计算器入口提示
+                st.markdown("**持有份额**")
+                st.caption("输入持有份额，或使用表单下方的「💰 金额计算器」按钮")
 
-                with col_shares:
-                    default_shares = current_asset.get('初始份额', 0)
-                    # 如果通过计算器计算了份额，使用计算的结果
-                    if st.session_state.get('calc_result_shares'):
-                        default_shares = st.session_state.calc_result_shares
-                        del st.session_state.calc_result_shares
+                default_shares = current_asset.get('初始份额', 0)
+                # 如果通过计算器计算了份额，使用计算的结果
+                if st.session_state.get('calc_result_shares'):
+                    default_shares = st.session_state.calc_result_shares
+                    del st.session_state.calc_result_shares
 
-                    shares = st.number_input(
-                        "持有份额 *",
-                        min_value=0.0,
-                        step=100.0,
-                        value=float(default_shares) if default_shares else 0.0,
-                        format="%.2f",
-                        help="输入持有份额",
-                        key="form_shares"
-                    )
-
-                with col_calc:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("💰", help="根据金额计算份额", key="open_calculator"):
-                        # 保存当前表单数据到session_state
-                        st.session_state.form_data = {
-                            '代码': code,
-                            '名称': name,
-                            '代码类型': code_type,
-                            '资产类别': asset_category
-                        }
-                        st.session_state.calc_code = code
-                        st.session_state.calc_code_type = code_type
-                        st.session_state.calc_price_fetched = False
-                        st.session_state.show_calculator = True
-                        st.rerun()
+                shares = st.number_input(
+                    "持有份额 *",
+                    min_value=0.0,
+                    step=100.0,
+                    value=float(default_shares) if default_shares else 0.0,
+                    format="%.2f",
+                    help="输入持有份额",
+                    key="form_shares"
+                )
 
                 # 显示当前价格信息
                 if current_price:
@@ -678,6 +672,18 @@ def render_config_manager():
                 st.session_state.show_add_form = False
                 st.session_state.editing_index = None
                 st.success(f"✅ 已删除资产：{deleted_name}")
+                st.rerun()
+
+        # 表单外的金额计算器按钮
+        st.markdown("---")
+        col_calc_btn, _ = st.columns([1, 3])
+        with col_calc_btn:
+            if st.button("💰 金额计算器", use_container_width=True):
+                # 从表单获取代码和类型
+                st.session_state.calc_code = st.session_state.get('temp_code', '')
+                st.session_state.calc_code_type = st.session_state.get('temp_code_type', '场内ETF')
+                st.session_state.calc_price_fetched = False
+                st.session_state.show_calculator = True
                 st.rerun()
 
         st.markdown("---")
