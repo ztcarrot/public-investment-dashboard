@@ -526,7 +526,6 @@ def render_config_manager():
                         with st.spinner(f"正在获取 {code} 的当前价格..."):
                             try:
                                 fetcher = DataFetcher()
-                                from datetime import datetime, timedelta
                                 end = datetime.now().strftime('%Y-%m-%d')
                                 start = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
 
