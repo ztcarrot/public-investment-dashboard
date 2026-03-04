@@ -432,9 +432,23 @@ def render_config_manager():
                     if valid_assets:
                         st.session_state.assets = valid_assets
                         assets_config_manager.save(valid_assets)
-                        # 清除缓存并跳转到首页
-                        st.cache_data.clear()
-                        st.session_state.current_page = 'dashboard'
+
+                        # 后台刷新数据
+                        with st.spinner("🔄 正在后台刷新数据..."):
+                            # 清除旧数据缓存
+                            keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
+                            for key in keys_to_remove:
+                                del st.session_state[key]
+
+                            # 重新加载数据
+                            start_date_str = st.session_state.start_date.strftime('%Y-%m-%d')
+                            historical_data, portfolio_data = load_data(start_date_str)
+
+                            if historical_data is not None and portfolio_data is not None:
+                                # 保存到session_state供配置页面使用
+                                st.session_state['historical_data'] = historical_data
+                                st.session_state['portfolio_data'] = portfolio_data
+
                         st.success(f"✅ 成功导入 {len(valid_assets)} 个资产配置")
                         st.rerun()
                     else:
@@ -457,8 +471,21 @@ def render_config_manager():
             st.session_state.assets = assets
             assets_config_manager.save(assets)
 
-            # 清除缓存并跳转到首页
-            st.cache_data.clear()
+            # 后台刷新数据
+            with st.spinner("🔄 正在后台刷新数据..."):
+                # 清除旧数据缓存
+                keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
+                for key in keys_to_remove:
+                    del st.session_state[key]
+
+                # 重新加载数据
+                start_date_str = st.session_state.start_date.strftime('%Y-%m-%d')
+                historical_data, portfolio_data = load_data(start_date_str)
+
+                if historical_data is not None and portfolio_data is not None:
+                    # 保存到session_state供配置页面使用
+                    st.session_state['historical_data'] = historical_data
+                    st.session_state['portfolio_data'] = portfolio_data
 
             # 显示来源信息
             if hasattr(st, 'secrets') and 'assets' in st.secrets:
@@ -466,7 +493,6 @@ def render_config_manager():
             else:
                 st.success(f"✅ 已重置为默认配置（{len(assets)} 个资产）")
 
-            st.session_state.current_page = 'dashboard'
             st.rerun()
 
     st.markdown("---")
@@ -619,9 +645,24 @@ def render_config_manager():
                     assets_config_manager.save(assets)
                     st.session_state.show_add_form = False
                     st.session_state.editing_index = None
-                    # 清除缓存并跳转到首页
-                    st.cache_data.clear()
-                    st.session_state.current_page = 'dashboard'
+
+                    # 后台刷新数据（不跳转页面）
+                    with st.spinner("🔄 正在后台刷新数据..."):
+                        # 清除旧数据缓存
+                        keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
+                        for key in keys_to_remove:
+                            del st.session_state[key]
+
+                        # 重新加载数据
+                        start_date_str = st.session_state.start_date.strftime('%Y-%m-%d')
+                        historical_data, portfolio_data = load_data(start_date_str)
+
+                        if historical_data is not None and portfolio_data is not None:
+                            # 保存到session_state供配置页面使用
+                            st.session_state['historical_data'] = historical_data
+                            st.session_state['portfolio_data'] = portfolio_data
+                            st.success("✅ 数据已刷新，配置页面金额已更新")
+
                     st.rerun()
 
             if cancel:
@@ -637,10 +678,24 @@ def render_config_manager():
                 assets_config_manager.save(assets)
                 st.session_state.show_add_form = False
                 st.session_state.editing_index = None
-                # 清除缓存并跳转到首页
-                st.cache_data.clear()
-                st.session_state.current_page = 'dashboard'
-                st.success(f"✅ 已删除资产：{deleted_name}")
+
+                # 后台刷新数据（不跳转页面）
+                with st.spinner("🔄 正在后台刷新数据..."):
+                    # 清除旧数据缓存
+                    keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
+                    for key in keys_to_remove:
+                        del st.session_state[key]
+
+                    # 重新加载数据
+                    start_date_str = st.session_state.start_date.strftime('%Y-%m-%d')
+                    historical_data, portfolio_data = load_data(start_date_str)
+
+                    if historical_data is not None and portfolio_data is not None:
+                        # 保存到session_state供配置页面使用
+                        st.session_state['historical_data'] = historical_data
+                        st.session_state['portfolio_data'] = portfolio_data
+                        st.success("✅ 数据已刷新，配置页面金额已更新")
+
                 st.rerun()
 
         st.markdown("---")
