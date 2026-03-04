@@ -150,6 +150,10 @@ def render_total_assets_chart(portfolio_data):
     first_date_str = format_date(first_date)
     last_date_str = format_date(last_date)
 
+    # 格式化数值用于显示
+    first_value_str = f"¥{first_value:,.0f}"
+    last_value_str = f"¥{last_value:,.0f}"
+
     # 计算最大回撤
     max_drawdown = 0
     max_drawdown_start = None
@@ -288,9 +292,57 @@ def render_total_assets_chart(portfolio_data):
 
     st.plotly_chart(fig, use_container_width=True)
 
+    # 计算年化增长率（CAGR）
+    def calculate_cagr(start_value, end_value, days):
+        """计算年化增长率"""
+        if start_value <= 0 or days <= 0:
+            return 0
+        years = days / 365.0
+        if years == 0:
+            return 0
+        cagr = (end_value / start_value) ** (1 / years) - 1
+        return cagr * 100  # 转换为百分比
+
+    # 计算总天数和年化增长率
+    total_days = (last_date - first_date).days if hasattr(last_date, '__sub__') else 0
+    if total_days <= 0:
+        # 如果日期是字符串，尝试计算
+        try:
+            from datetime import datetime
+            if isinstance(last_date, str) and isinstance(first_date, str):
+                last_dt = datetime.strptime(str(last_date), '%Y-%m-%d')
+                first_dt = datetime.strptime(str(first_date), '%Y-%m-%d')
+                total_days = (last_dt - first_dt).days
+        except:
+            total_days = 0
+
+    cagr = calculate_cagr(first_value, last_value, total_days)
+
+    # 计算最长不增长时间区间（从峰值到创新高的最长时间）
+    max_recovery_days = 0
+    max_recovery_start = None
+    max_recovery_end = None
+    peak_idx = 0
+
+    for i in range(1, len(portfolio_data)):
+        current_value = total_assets.iloc[i]
+
+        # 如果当前值超过了之前的峰值，检查恢复时间
+        if current_value > total_assets.iloc[peak_idx]:
+            recovery_days = i - peak_idx
+            if recovery_days > max_recovery_days:
+                max_recovery_days = recovery_days
+                max_recovery_start = portfolio_data.iloc[peak_idx]['日期']
+                max_recovery_end = portfolio_data.iloc[i]['日期']
+            peak_idx = i
+
+    max_recovery_start_str = format_date(max_recovery_start) if max_recovery_start is not None else None
+    max_recovery_end_str = format_date(max_recovery_end) if max_recovery_end is not None else None
+
     # 显示统计信息
     st.markdown("### 📊 统计摘要")
 
+    # 第一行：基础统计
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
@@ -322,6 +374,40 @@ def render_total_assets_chart(portfolio_data):
             value=f"{max_drawdown*100:.2f}%",
             delta=f"从 ¥{max_value:,.2f} 回落",
             help=f"回撤区间: {max_drawdown_start_str} → {max_drawdown_end_str}"
+        )
+
+    # 第二行：高级统计
+    st.markdown("### 📈 高级指标")
+
+    col5, col6, col7 = st.columns(3)
+
+    with col5:
+        st.metric(
+            label="📊 年化增长率（CAGR）",
+            value=f"{cagr:+.2f}%",
+            help=f"复合年增长率：({last_value_str} / {first_value_str})^(1/{total_days/365:.2f}年) - 1",
+            delta_color="normal"
+        )
+
+    with col6:
+        if max_recovery_days > 0:
+            st.metric(
+                label="⏱️ 最长恢复期",
+                value=f"{max_recovery_days} 天",
+                help=f"从峰值到创新高的最长时间：{max_recovery_start_str} → {max_recovery_end_str}"
+            )
+        else:
+            st.metric(
+                label="⏱️ 最长恢复期",
+                value="无",
+                help="没有显著的恢复期"
+            )
+
+    with col7:
+        st.metric(
+            label="📅 投资天数",
+            value=f"{total_days} 天",
+            help=f"从 {first_date_str} 到 {last_date_str}，约 {total_days/365:.1f} 年"
         )
 
     st.markdown("---")
