@@ -99,7 +99,7 @@ def validate_asset(asset: Dict) -> tuple[bool, str]:
     - 代码和名称不能为空
     - 代码类型必须是：场内ETF、基金、股票、债券
     - 资产类别必须是：国债、股票、黄金、现金
-    - 初始份额和初始金额互斥（只能输入其中一个）
+    - 必须输入初始份额
 
     Args:
         asset: 待验证的资产配置字典
@@ -133,90 +133,28 @@ def validate_asset(asset: Dict) -> tuple[bool, str]:
         if asset['资产类别'] not in valid_asset_categories:
             return False, f"资产类别必须是以下之一: {', '.join(valid_asset_categories)}"
 
-        # 验证初始份额和初始金额的互斥性
+        # 验证初始份额
         initial_shares = asset.get('初始份额')
-        initial_amount = asset.get('初始金额')
 
-        # 如果两个都为 None 或 0
-        if (initial_shares is None or initial_shares == 0) and (initial_amount is None or initial_amount == 0):
-            return False, "初始份额和初始金额必须输入其中一个"
-
-        # 如果两个都有值，则报错
-        if initial_shares is not None and initial_amount is not None and initial_shares > 0 and initial_amount > 0:
-            return False, "初始份额和初始金额只能输入其中一个"
+        # 必须输入初始份额
+        if initial_shares is None or initial_shares == 0:
+            return False, "必须输入初始份额"
 
         # 验证数值
-        if initial_shares is not None and initial_shares > 0:
-            try:
-                shares = float(initial_shares)
-                if shares < 0:
-                    return False, "初始份额不能为负数"
-            except (TypeError, ValueError):
-                return False, "初始份额必须是有效的数字"
+        try:
+            shares = float(initial_shares)
+            if shares < 0:
+                return False, "初始份额不能为负数"
+        except (TypeError, ValueError):
+            return False, "初始份额必须是有效的数字"
 
-        if initial_amount is not None and initial_amount > 0:
-            try:
-                amount = float(initial_amount)
-                if amount < 0:
-                    return False, "初始金额不能为负数"
-            except (TypeError, ValueError):
-                return False, "初始金额必须是有效的数字"
+        # 所有验证通过
+        return True, ""
+
+    except Exception as e:
+        return False, f"验证过程中发生错误: {str(e)}"
 
         return True, ""
 
     except Exception as e:
         return False, f"验证出错: {str(e)}"
-
-
-def calculate_shares_or_amount(asset: Dict, current_price: float) -> Dict[str, float]:
-    """
-    根据当前价格计算份额或金额。
-
-    如果资产配置了初始份额，则计算对应的金额。
-    如果资产配置了初始金额，则计算对应的份额。
-
-    Args:
-        asset: 资产配置字典
-        current_price: 资产的当前价格
-
-    Returns:
-        包含计算结果的字典，格式为：
-        {
-            'shares': float,  # 份额
-            'amount': float   # 金额
-        }
-
-    Raises:
-        ValueError: 如果价格无效或无法计算
-    """
-    # 验证当前价格
-    if current_price is None or current_price <= 0:
-        raise ValueError("当前价格必须大于0")
-
-    initial_shares = asset.get('初始份额')
-    initial_amount = asset.get('初始金额')
-
-    # 根据初始份额计算金额
-    if initial_shares is not None:
-        shares = float(initial_shares)
-        amount = shares * current_price
-        return {
-            'shares': shares,
-            'amount': amount
-        }
-
-    # 根据初始金额计算份额
-    elif initial_amount is not None:
-        amount = float(initial_amount)
-        shares = amount / current_price
-        return {
-            'shares': shares,
-            'amount': amount
-        }
-
-    # 如果两者都为 None，返回 0
-    else:
-        return {
-            'shares': 0.0,
-            'amount': 0.0
-        }

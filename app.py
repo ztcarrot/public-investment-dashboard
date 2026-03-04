@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 import logging
 
 from utils.data_fetcher import DataFetcher
-from utils.config_manager import get_default_assets, parse_secrets_assets, validate_asset, calculate_shares_or_amount
+from utils.config_manager import get_default_assets, parse_secrets_assets, validate_asset
 from utils.local_storage import save_to_session, load_from_session
 import json
 
@@ -471,81 +471,6 @@ def render_config_manager():
     if st.session_state.get('show_add_form', False):
         st.subheader("📝 添加/编辑资产")
 
-        # 金额计算器（在表单外面）
-        if st.session_state.get('show_calculator', False):
-            st.markdown("---")
-            st.markdown("### 💰 金额计算器")
-            st.caption("输入您想要投资的金额，系统会根据当前价格自动计算份额")
-
-            # 重新获取价格（如果还没有）
-            if not st.session_state.get('calc_price_fetched', False):
-                calc_code = st.session_state.get('calc_code', '')
-                calc_code_type = st.session_state.get('calc_code_type', '')
-
-                if calc_code and len(calc_code) == 6:
-                    with st.spinner(f"正在获取 {calc_code} 的当前价格..."):
-                        try:
-                            fetcher = DataFetcher()
-                            from datetime import datetime, timedelta
-                            end = datetime.now().strftime('%Y-%m-%d')
-                            start = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-
-                            temp_asset = {
-                                '代码': calc_code,
-                                '代码类型': calc_code_type,
-                                '初始份额': 1.0
-                            }
-                            history = fetcher.fetch_asset_data(temp_asset, start, end)
-                            if not history.empty and '净值' in history.columns:
-                                st.session_state.calc_price = history['净值'].iloc[-1]
-                                st.session_state.calc_price_fetched = True
-                        except Exception as e:
-                            st.error(f"❌ 无法获取价格: {str(e)}")
-                            if st.button("🔄 重试"):
-                                st.session_state.calc_price_fetched = False
-                                st.rerun()
-
-            if st.session_state.get('calc_price_fetched', False) and not st.session_state.get('calc_price', None):
-                st.warning("⚠️ 请先返回表单输入有效的代码")
-                if st.button("🔙 返回表单"):
-                    st.session_state.show_calculator = False
-                    st.rerun()
-
-            if st.session_state.get('calc_price', None):
-                calc_amount = st.number_input(
-                    "投资金额（元）*",
-                    min_value=0.0,
-                    step=1000.0,
-                    value=10000.0,
-                    format="%.2f",
-                    help="输入您想投资的金额"
-                )
-
-                if calc_amount > 0:
-                    current_price = st.session_state.calc_price
-                    calculated_shares = calc_amount / current_price
-                    st.info(f"💵 投资金额: ¥{calc_amount:,.2f} | 当前价格: ¥{current_price:.4f} | **计算份额: {calculated_shares:,.2f} 份**")
-
-                    col_confirm, col_cancel = st.columns(2)
-                    with col_confirm:
-                        if st.button("✅ 确认使用", use_container_width=True):
-                            st.session_state.calc_result_shares = calculated_shares
-                            st.session_state.show_calculator = False
-                            st.success("✅ 份额已计算，请返回表单查看")
-                            st.rerun()
-                    with col_cancel:
-                        if st.button("❌ 取消", use_container_width=True):
-                            st.session_state.show_calculator = False
-                            st.rerun()
-                else:
-                    st.warning("⚠️ 请输入有效的金额")
-
-            if st.button("🔙 返回表单"):
-                st.session_state.show_calculator = False
-                st.rerun()
-
-            st.markdown("---")
-
         # 表单
         editing_index = st.session_state.get('editing_index')
         is_edit = editing_index is not None
@@ -597,12 +522,9 @@ def render_config_manager():
                     key="form_asset_category"
                 )
 
-                # 保存到session_state供计算器使用
-                st.session_state.temp_asset_category = asset_category
-
                 # 持有份额输入
                 st.markdown("**持有信息**")
-                st.caption("输入持有份额，或使用表单下方的「💰 金额计算器」按钮")
+                st.caption("输入持有份额")
 
                 # 获取当前价格（用于显示）
                 current_price = None
@@ -633,27 +555,17 @@ def render_config_manager():
                     else:
                         current_price = st.session_state.current_price_cache.get(cache_key)
 
-                # 显示金额计算器入口提示
-                st.markdown("**持有份额**")
-                st.caption("输入持有份额，或使用表单下方的「💰 金额计算器」按钮")
-
-                default_shares = current_asset.get('初始份额', 0)
-                # 如果通过计算器计算了份额，使用计算的结果
-                if st.session_state.get('calc_result_shares'):
-                    default_shares = st.session_state.calc_result_shares
-                    del st.session_state.calc_result_shares
-
                 shares = st.number_input(
                     "持有份额 *",
                     min_value=0.0,
                     step=100.0,
-                    value=float(default_shares) if default_shares else 0.0,
+                    value=float(current_asset.get('初始份额', 0) if current_asset.get('初始份额') else 0.0),
                     format="%.2f",
                     help="输入持有份额",
                     key="form_shares"
                 )
 
-                # 显示当前价格信息
+                # 显示当前价格和预估市值
                 if current_price:
                     if shares and shares > 0:
                         estimated_value = current_price * shares
@@ -728,18 +640,6 @@ def render_config_manager():
                 st.success(f"✅ 已删除资产：{deleted_name}")
                 st.rerun()
 
-        # 表单外的金额计算器按钮
-        st.markdown("---")
-        col_calc_btn, _ = st.columns([1, 3])
-        with col_calc_btn:
-            if st.button("💰 金额计算器", use_container_width=True):
-                # 从表单获取代码和类型
-                st.session_state.calc_code = st.session_state.get('temp_code', '')
-                st.session_state.calc_code_type = st.session_state.get('temp_code_type', '场内ETF')
-                st.session_state.calc_price_fetched = False
-                st.session_state.show_calculator = True
-                st.rerun()
-
         st.markdown("---")
 
     # 配置列表（只读显示，点击编辑）
@@ -754,16 +654,9 @@ def render_config_manager():
     # 显示资产列表
     for idx, asset in enumerate(assets):
         shares = asset.get('初始份额', 0)
-        amount = asset.get('初始金额', 0)
 
         # 构建显示信息
-        holding_info = []
-        if shares and shares > 0:
-            holding_info.append(f"{shares:,.2f} 份")
-        if amount and amount > 0:
-            holding_info.append(f"¥{amount:,.2f}")
-
-        holding_display = " | ".join(holding_info) if holding_info else "未配置"
+        holding_display = f"{shares:,.2f} 份" if shares and shares > 0 else "未配置"
 
         with st.expander(f"{idx + 1}. {asset['名称']} ({asset['代码']}) - {holding_display}", expanded=False):
             col_info1, col_info2, col_info3 = st.columns([2, 2, 1])
@@ -777,11 +670,9 @@ def render_config_manager():
                 st.write(f"**资产类别**: {asset['资产类别']}")
 
             with col_info3:
-                # 显示持有信息
+                # 显示持有份额
                 if shares and shares > 0:
-                    st.metric("初始份额", f"{shares:,.2f}")
-                if amount and amount > 0:
-                    st.metric("初始金额", f"¥{amount:,.2f}")
+                    st.metric("持有份额", f"{shares:,.2f}")
 
                 st.markdown("<br>", unsafe_allow_html=True)  # 添加间距
 
@@ -793,6 +684,8 @@ def render_config_manager():
     st.markdown("---")
     st.caption(f"📊 当前配置：共 {len(assets)} 个资产")
     st.caption("💡 提示：点击资产左侧的 ▶ 展开详情，点击「编辑」按钮修改配置")
+
+
 def load_assets_config():
     """加载资产配置 - 按优先级"""
     # 1. 尝试从 session_state 加载（用户修改后的配置）
