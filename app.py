@@ -9,8 +9,15 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
+import logging
 
 from utils.data_fetcher import DataFetcher
+from utils.config_manager import get_default_assets, parse_secrets_assets, validate_asset, calculate_shares_or_amount
+from utils.local_storage import save_to_localstorage, load_from_localstorage
+import json
+
+# 配置日志
+logger = logging.getLogger(__name__)
 
 
 # 页面配置
@@ -337,6 +344,24 @@ def render_data_table(historical_data, portfolio_data):
     )
 
 
+def load_assets_config():
+    """加载资产配置 - 按优先级"""
+    # 1. 尝试从 LocalStorage 加载
+    local_config = load_from_localstorage('investment_assets')
+    if local_config and len(local_config) > 0:
+        logger.info("从 LocalStorage 加载配置")
+        return local_config
+
+    # 2. 尝试从 secrets 加载
+    if hasattr(st, 'secrets') and 'assets' in st.secrets:
+        logger.info("从 secrets.toml 加载配置")
+        return parse_secrets_assets(st.secrets['assets'])
+
+    # 3. 使用默认配置
+    logger.info("使用默认配置")
+    return get_default_assets()
+
+
 def main():
     """主函数"""
 
@@ -345,27 +370,10 @@ def main():
 
     # 初始化session state
     if 'assets' not in st.session_state:
-        # 从 Streamlit Secrets 读取资产配置
-        if hasattr(st, 'secrets') and 'assets' in st.secrets:
-            assets_data = st.secrets['assets']
+        st.session_state.assets = load_assets_config()
 
-            # 判断配置类型
-            if isinstance(assets_data, str):
-                # Streamlit Cloud: JSON 字符串格式
-                import json
-                try:
-                    st.session_state.assets = json.loads(assets_data)
-                except json.JSONDecodeError:
-                    st.error("❌ Secrets 配置格式错误：assets 必须是有效的 JSON 数组")
-                    st.session_state.assets = []
-            elif isinstance(assets_data, list):
-                # 本地开发: 已经解析的列表
-                st.session_state.assets = assets_data
-            else:
-                st.error(f"❌ 未知的配置格式: {type(assets_data)}")
-                st.session_state.assets = []
-        else:
-            st.session_state.assets = []
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = 'dashboard'
 
     # 初始化数字显示状态（默认隐藏）
     if 'show_numbers' not in st.session_state:
