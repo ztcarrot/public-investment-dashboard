@@ -380,26 +380,25 @@ def render_total_assets_chart(portfolio_data):
         )
 
     with col3:
-        first_change = ((last_value - first_value) / first_value * 100) if first_value > 0 else 0
         st.metric(
-            label="➡️ 初值→末值",
-            value=f"¥{first_value:,.2f} → ¥{last_value:,.2f}",
-            delta=f"{first_change:+.2f}%",
-            help=f"从 {first_date_str} 到 {last_date_str}"
+            label="➡️ 初值",
+            value=f"¥{first_value:,.2f}",
+            help=f"起始日期: {first_date_str}"
         )
 
     with col4:
+        first_change = ((last_value - first_value) / first_value * 100) if first_value > 0 else 0
         st.metric(
-            label="📊 最大回撤",
-            value=f"{max_drawdown*100:.2f}%",
-            delta=f"从 ¥{max_value:,.2f} 回落",
-            help=f"回撤区间: {max_drawdown_start_str} → {max_drawdown_end_str}"
+            label="⬅️ 末值",
+            value=f"¥{last_value:,.2f}",
+            delta=f"{first_change:+.2f}%",
+            help=f"截止日期: {last_date_str}"
         )
 
     # 第二行：高级统计
     st.markdown("### 📈 高级指标")
 
-    col5, col6, col7 = st.columns(3)
+    col5, col6, col7, col8 = st.columns(4)
 
     with col5:
         st.metric(
@@ -424,6 +423,14 @@ def render_total_assets_chart(portfolio_data):
             )
 
     with col7:
+        st.metric(
+            label="📊 最大回撤",
+            value=f"{max_drawdown*100:.2f}%",
+            delta=f"从 ¥{max_value:,.2f} 回落",
+            help=f"回撤区间: {max_drawdown_start_str} → {max_drawdown_end_str}"
+        )
+
+    with col8:
         st.metric(
             label="📅 投资天数",
             value=f"{total_days} 天",
