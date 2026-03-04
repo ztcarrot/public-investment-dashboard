@@ -130,11 +130,13 @@ def render_total_assets_chart(portfolio_data):
     first_value = total_assets.iloc[0]
     last_value = total_assets.iloc[-1]
 
+    # 使用位置索引而不是标签索引，避免索引不连续的问题
     max_idx = total_assets.idxmax()
     min_idx = total_assets.idxmin()
 
-    max_date = portfolio_data.loc[max_idx, '日期']
-    min_date = portfolio_data.loc[min_idx, '日期']
+    # 使用iloc通过位置访问，更安全
+    max_date = portfolio_data.iloc[max_idx]['日期']
+    min_date = portfolio_data.iloc[min_idx]['日期']
     first_date = portfolio_data.iloc[0]['日期']
     last_date = portfolio_data.iloc[-1]['日期']
 
