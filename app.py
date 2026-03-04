@@ -158,6 +158,32 @@ def render_allocation_chart(portfolio_data):
     if portfolio_data is None or portfolio_data.empty:
         return
 
+    st.subheader("当前资产配置（最新一天）")
+
+    # 资产金额饼图
+    latest = portfolio_data.iloc[-1]
+
+    fig_pie = go.Figure(data=[go.Pie(
+        labels=['股票', '黄金', '现金', '国债'],
+        values=[latest['股票'], latest['黄金'], latest['现金'], latest['国债']],
+        textinfo='label+percent',
+        texttemplate='%{label}<br>¥%{value:,.0f}<br>(%{percent})',
+        hole=0.3,  # 甜甜圈图
+        marker=dict(
+            colors=['#FF6B6B', '#FFA500', '#4ECDC4', '#95E1D3']
+        )
+    )])
+
+    fig_pie.update_layout(
+        title="资产金额分布",
+        template='plotly_white',
+        height=400,
+        showlegend=True
+    )
+
+    st.plotly_chart(fig_pie, use_container_width=True)
+
+    st.markdown("---")
     st.subheader("资产配置趋势")
 
     # 占比堆叠面积图
@@ -345,6 +371,11 @@ def render_data_table(historical_data, portfolio_data):
 
 def render_config_manager():
     """渲染配置管理页面 - 使用表单编辑"""
+    # 返回首页按钮
+    if st.button("🏠 返回首页", key="back_to_dashboard"):
+        st.session_state.current_page = 'dashboard'
+        st.rerun()
+
     st.title("⚙️ 配置管理")
     st.markdown("---")
 
@@ -731,7 +762,9 @@ def main():
     col1, col2, col3 = st.columns([2, 1, 1])
 
     with col1:
-        st.info(f"📌 当前已配置 {len(assets)} 个资产")
+        if st.button(f"📌 当前已配置 {len(assets)} 个资产", key="goto_config"):
+            st.session_state.current_page = 'config'
+            st.rerun()
 
     with col2:
         if st.button("🔄 刷新数据", type="primary"):
