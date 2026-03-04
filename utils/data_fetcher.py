@@ -492,36 +492,57 @@ class DataFetcher:
         if historical_data.empty:
             return pd.DataFrame()
 
-        # 按日期分组汇总
-        grouped = historical_data.groupby('日期').agg({'当前市值': 'sum'}).reset_index()
-        grouped.columns = ['日期', '总资产']
+        # 创建完整的日期范围
+        all_dates = historical_data['日期'].unique()
+        all_dates = sorted(all_dates)
 
-        # 按资产类型汇总
+        # 对每个资产类型分别处理
+        asset_type_dfs = {}
         for asset_type in ['股票', '黄金', '现金', '国债']:
-            asset_df = historical_data[historical_data['资产类型'] == asset_type].groupby('日期').agg({'当前市值': 'sum'}).reset_index()
-            asset_df.columns = ['日期', asset_type]
-            grouped = grouped.merge(asset_df, on='日期', how='left')
+            # 筛选该资产类型的数据
+            type_data = historical_data[historical_data['资产类型'] == asset_type].copy()
 
-        # 填充空值
+            if type_data.empty:
+                # 如果该资产类型没有数据，创建全0的Series
+                asset_type_dfs[asset_type] = pd.Series(0, index=all_dates)
+            else:
+                # 按日期分组求和
+                type_grouped = type_data.groupby('日期')['当前市值'].sum()
+
+                # 重建索引，确保所有日期都存在
+                type_grouped = type_grouped.reindex(all_dates)
+
+                # 前向填充缺失值（对于基金类型）
+                # 检查该资产类型中是否有基金
+                has_fund = '基金' in type_data['代码类型'].values
+
+                if has_fund:
+                    # 前向填充
+                    type_grouped = type_grouped.ffill()
+                    # 如果还有空值（开头），用0填充
+                    type_grouped = type_grouped.fillna(0)
+                else:
+                    # 非基金类型，用0填充
+                    type_grouped = type_grouped.fillna(0)
+
+                asset_type_dfs[asset_type] = type_grouped
+
+        # 构建汇总DataFrame
+        grouped = pd.DataFrame({'日期': all_dates})
+        grouped['总资产'] = sum(asset_type_dfs.values())
+
         for asset_type in ['股票', '黄金', '现金', '国债']:
-            if asset_type not in grouped.columns:
-                grouped[asset_type] = 0
-            grouped[asset_type] = grouped[asset_type].fillna(0)
+            grouped[asset_type] = asset_type_dfs[asset_type].values
 
-        # 过滤非交易日：如果某天有任何资产类型的值为0，则认为是非交易日
-        # 获取当天实际存在的资产类型（从原始数据中统计）
-        asset_types_per_day = historical_data.groupby('日期')['资产类型'].nunique()
-        total_asset_types = historical_data['资产类型'].nunique()
+        # 过滤非交易日：如果某天所有资产类型的值都是0，则认为是非交易日
+        grouped = grouped[(grouped['股票'] > 0) | (grouped['黄金'] > 0) |
+                         (grouped['现金'] > 0) | (grouped['国债'] > 0)]
 
-        # 只保留所有资产类型都有数据的日期（交易日）
-        valid_dates = asset_types_per_day[asset_types_per_day == total_asset_types].index
-        grouped = grouped[grouped['日期'].isin(valid_dates)]
-
-        logger.info(f"过滤掉非交易日，从 {len(asset_types_per_day)} 天减少到 {len(grouped)} 个交易日")
-
-        # 计算占比
+        # 重新计算占比
         total_assets = grouped['总资产']
         for asset_type in ['股票', '黄金', '现金', '国债']:
             grouped[f'{asset_type}占比'] = (grouped[asset_type] / total_assets * 100).round(2)
+
+        logger.info(f"汇总数据生成完成，共 {len(grouped)} 个交易日")
 
         return grouped
