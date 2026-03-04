@@ -30,7 +30,7 @@ st.set_page_config(
 
 
 @st.cache_data(ttl=3600)
-def load_data(date_range="最近90天"):
+def load_data(date_range="最近90天", custom_days=None):
     """加载或抓取数据"""
     assets = st.session_state.get('assets', [])
 
@@ -43,7 +43,11 @@ def load_data(date_range="最近90天"):
         "最近180天": 180,
         "最近365天": 365
     }
-    days = days_map.get(date_range, 90)
+
+    if date_range == "自定义" and custom_days is not None:
+        days = custom_days
+    else:
+        days = days_map.get(date_range, 90)
 
     end_date = datetime.now().strftime('%Y-%m-%d')
     start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
@@ -837,14 +841,27 @@ def main():
         # 日期范围选择
         date_range = st.selectbox(
             "数据范围",
-            options=["最近90天", "最近180天", "最近365天"],
+            options=["最近90天", "最近180天", "最近365天", "自定义"],
             index=2  # 默认选择365天
         )
+
+        # 如果选择自定义，显示天数输入框
+        if date_range == "自定义":
+            custom_days = st.number_input(
+                "输入天数",
+                min_value=1,
+                max_value=3650,  # 最多10年
+                value=365,
+                step=1,
+                key="custom_days_input"
+            )
+        else:
+            custom_days = None
 
     st.markdown("---")
 
     # 加载数据
-    historical_data, portfolio_data = load_data(date_range)
+    historical_data, portfolio_data = load_data(date_range, custom_days)
 
     if historical_data is None or portfolio_data is None:
         st.error("❌ 数据加载失败，请检查网络连接或配置")
