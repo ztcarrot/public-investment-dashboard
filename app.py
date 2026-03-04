@@ -636,9 +636,9 @@ def render_config_manager():
     with col_header:
         st.subheader("📋 资产配置列表")
     with col_refresh:
-        if st.button("🔄 刷新价格", key="refresh_prices", use_container_width=True):
-            if 'current_price_cache' in st.session_state:
-                del st.session_state.current_price_cache
+        if st.button("🔄 返回首页刷新", key="back_to_dashboard_refresh", use_container_width=True):
+            st.session_state.current_page = 'dashboard'
+            st.session_state.page_selection = 0
             st.cache_data.clear()
             st.rerun()
 
@@ -647,6 +647,23 @@ def render_config_manager():
     if not assets:
         st.warning("⚠️ 当前没有配置任何资产，点击上方「➕ 添加资产」开始")
         return
+
+    # 提示信息
+    if 'historical_data' not in st.session_state or st.session_state['historical_data'].empty:
+        st.info("💡 提示：请先返回首页加载数据，然后在此页面查看资产金额")
+        latest_prices = {}
+    else:
+        # 从历史数据中获取最新价格
+        historical_data = st.session_state['historical_data']
+        latest_prices = {}
+        for code in historical_data['代码'].unique():
+            code_data = historical_data[historical_data['代码'] == code]
+            if not code_data.empty and '最新价格' in code_data.columns:
+                latest_prices[code] = float(code_data['最新价格'].iloc[-1])
+        if latest_prices:
+            st.success(f"✅ 已从首页数据获取到 {len(latest_prices)} 个资产的最新价格")
+        else:
+            st.warning("⚠️ 未从首页数据获取到价格信息，请返回首页刷新数据")
 
     # 调试信息
     if st.checkbox("显示调试信息"):
@@ -662,91 +679,18 @@ def render_config_manager():
         code = asset.get('代码')
         code_type = asset.get('代码类型')
 
-        # 获取当前价格和金额
+        # 获取当前价格和金额（优先使用dashboard数据）
         current_amount = None
         current_price = None
         if shares and shares > 0 and code:
-            try:
-                # 从缓存或实时获取当前价格
-                if 'current_price_cache' not in st.session_state:
-                    st.session_state.current_price_cache = {}
-
-                cache_key = f"{code}_{code_type}"
-                if cache_key in st.session_state.current_price_cache:
-                    current_price = st.session_state.current_price_cache[cache_key]
-                    current_amount = current_price * shares
-                else:
-                    # 实时获取价格 - 使用更大的日期范围
-                    fetcher = DataFetcher()
-                    end = datetime.now().strftime('%Y-%m-%d')
-                    start = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
-
-                    temp_asset = {
-                        '代码': code,
-                        '名称': asset.get('名称', ''),
-                        '代码类型': code_type,
-                        '资产类别': asset.get('资产类别', '股票'),
-                        '初始份额': 1.0
-                    }
-
-                    # 尝试获取数据
-                    history = fetcher.fetch_asset_data(temp_asset, start, end)
-
-                    if not history.empty and '净值' in history.columns:
-                        current_price = float(history['净值'].iloc[-1])
-                        current_amount = current_price * shares
-                        st.session_state.current_price_cache[cache_key] = current_price
-                        logger.info(f"✅ {code} 价格: {current_price:.4f}, 金额: {current_amount:.2f}")
-                    else:
-                        logger.warning(f"❌ {code} API返回空数据，尝试备用方法")
-
-                        # 备用方法：直接使用东方财富API获取最新价格
-                        try:
-                            import requests
-                            # 构建东方财富API URL
-                            if code_type == '场内ETF':
-                                if code.startswith('5') or code.startswith('6') or code.startswith('11'):
-                                    secid = f"1.{code}"
-                                else:
-                                    secid = f"0.{code}"
-                                url = f"http://push2.eastmoney.com/api/qt/stock/kline/get?secid={secid}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=101&fqt=0&beg=20200101&end={end.replace('-', '')}"
-                            elif code_type == '基金':
-                                url = f"http://fund.eastmoney.com/pingzhongdata/{code.zfill(6)}.js"
-                            else:
-                                logger.warning(f"❌ {code} 不支持的代码类型: {code_type}")
-                                current_price = None
-
-                            if url:
-                                response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
-                                if response.status_code == 200:
-                                    if code_type == '场内ETF':
-                                        import json
-                                        data = response.json()
-                                        if data.get('data') and data['data'].get('klines'):
-                                            kline = data['data']['klines'][0]
-                                            price = float(kline.split(',')[2])
-                                            current_price = price
-                                            current_amount = current_price * shares
-                                            st.session_state.current_price_cache[cache_key] = current_price
-                                            logger.info(f"✅ {code} 备用方法成功: {current_price:.4f}")
-                                    elif code_type == '基金':
-                                        import re
-                                        match = re.search(r'Data_netWorthTrend.*?\[\[(.*?)\]\]', response.text)
-                                        if match:
-                                            data_str = match.group(1).split('],[')[0]
-                                            price = float(data_str.split(',')[1].replace('"', '').strip())
-                                            current_price = price
-                                            current_amount = current_price * shares
-                                            st.session_state.current_price_cache[cache_key] = current_price
-                                            logger.info(f"✅ {code} 基金备用方法成功: {current_price:.4f}")
-                                else:
-                                    logger.warning(f"❌ {code} 备用API失败: HTTP {response.status_code}")
-                        except Exception as e2:
-                            logger.error(f"❌ {code} 备用方法异常: {e2}")
-            except Exception as e:
-                logger.error(f"❌ {code} 异常: {e}")
-                import traceback
-                logger.error(traceback.format_exc())
+            # 优先从dashboard数据获取
+            if code in latest_prices:
+                current_price = latest_prices[code]
+                current_amount = current_price * shares
+            else:
+                # 如果dashboard没有数据，标记为待获取
+                current_price = None
+                current_amount = None
 
         # 构建显示信息
         holding_display = f"{shares:,.2f} 份" if shares and shares > 0 else "未配置"
@@ -909,6 +853,10 @@ def main():
     if historical_data is None or portfolio_data is None:
         st.error("❌ 数据加载失败，请检查网络连接或配置")
         return
+
+    # 保存数据到session_state供配置页面使用
+    st.session_state['historical_data'] = historical_data
+    st.session_state['portfolio_data'] = portfolio_data
 
     # 获取最新数据
     latest = portfolio_data.iloc[-1]
