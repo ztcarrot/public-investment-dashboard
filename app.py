@@ -15,6 +15,7 @@ from utils.data_fetcher import DataFetcher
 from utils.config_manager import get_default_assets, parse_secrets_assets, validate_asset
 from utils.local_storage import save_to_session, load_from_session
 from utils.date_config import date_config_manager
+from utils.assets_config import assets_config_manager
 import json
 
 # 配置日志
@@ -430,7 +431,7 @@ def render_config_manager():
                             valid_assets.append(asset)
                     if valid_assets:
                         st.session_state.assets = valid_assets
-                        save_to_session('investment_assets', valid_assets)
+                        assets_config_manager.save(valid_assets)
                         # 清除缓存并跳转到首页
                         st.cache_data.clear()
                         st.session_state.current_page = 'dashboard'
@@ -454,7 +455,7 @@ def render_config_manager():
             # 重新加载配置（会按优先级：secrets → 默认）
             assets = load_assets_config()
             st.session_state.assets = assets
-            save_to_session('investment_assets', assets)
+            assets_config_manager.save(assets)
 
             # 清除缓存并跳转到首页
             st.cache_data.clear()
@@ -615,7 +616,7 @@ def render_config_manager():
                         st.success(f"✅ 已添加资产：{name}")
 
                     st.session_state.assets = assets
-                    save_to_session('investment_assets', assets)
+                    assets_config_manager.save(assets)
                     st.session_state.show_add_form = False
                     st.session_state.editing_index = None
                     # 清除缓存并跳转到首页
@@ -633,7 +634,7 @@ def render_config_manager():
                 deleted_name = assets[editing_index].get('名称', '未知')
                 assets.pop(editing_index)
                 st.session_state.assets = assets
-                save_to_session('investment_assets', assets)
+                assets_config_manager.save(assets)
                 st.session_state.show_add_form = False
                 st.session_state.editing_index = None
                 # 清除缓存并跳转到首页
@@ -738,22 +739,17 @@ def render_config_manager():
 
 
 def load_assets_config():
-    """加载资产配置 - 按优先级"""
-    # 1. 尝试从 session_state 加载（用户修改后的配置）
-    session_config = load_from_session('investment_assets')
-    if session_config and len(session_config) > 0:
-        logger.info("从 session_state 加载配置")
-        return session_config
-
-    # 2. 尝试从 secrets.toml 加载
+    """加载资产配置 - 使用配置管理器"""
+    # 获取 secrets.toml 的配置（作为默认配置）
+    secrets_assets = None
     try:
         if hasattr(st, 'secrets') and 'assets' in st.secrets:
-            secrets_assets = st.secrets['assets']
-            logger.info(f"从 secrets.toml 加载配置: {len(secrets_assets) if isinstance(secrets_assets, list) else 1} 个资产")
+            raw_assets = st.secrets['assets']
+            logger.info(f"从 secrets.toml 读取配置: {len(raw_assets) if isinstance(raw_assets, list) else 1} 个资产")
 
             # 解析并验证 secrets 配置
             parsed_assets = []
-            for asset in secrets_assets:
+            for asset in raw_assets:
                 is_valid, error_msg = validate_asset(asset)
                 if is_valid:
                     parsed_assets.append(asset)
@@ -761,18 +757,17 @@ def load_assets_config():
                     logger.warning(f"secrets 中的资产配置无效: {error_msg}")
 
             if parsed_assets:
-                logger.info(f"成功从 secrets.toml 加载 {len(parsed_assets)} 个有效资产配置")
-                return parsed_assets
+                secrets_assets = parsed_assets
             else:
-                logger.warning("secrets.toml 中的资产配置全部无效，使用默认配置")
-        else:
-            logger.info("secrets.toml 中未找到 assets 配置")
+                logger.warning("secrets.toml 中的资产配置全部无效")
     except Exception as e:
         logger.error(f"从 secrets.toml 加载配置失败: {str(e)}")
 
-    # 3. 默认使用默认配置（4个资产）
-    logger.info("使用默认配置")
-    return get_default_assets()
+    # 获取默认配置
+    default_assets = get_default_assets()
+
+    # 使用配置管理器加载（优先级：session_state > 文件 > secrets > 默认）
+    return assets_config_manager.load(secrets_assets, default_assets)
 
 
 def main():

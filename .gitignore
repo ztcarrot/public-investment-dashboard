@@ -53,3 +53,4 @@ temp/
 *.tmp
 *.bak
 data/date_config.json
+data/user_assets.json
