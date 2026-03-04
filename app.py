@@ -393,8 +393,25 @@ def render_config_manager():
 
     # 添加/编辑资产表单
     if st.session_state.get('show_add_form', False):
+        # 如果需要滚动到表单
+        if st.session_state.get('scroll_to_form', False):
+            st.components.v1.html("""
+            <script>
+                setTimeout(function() {
+                    const element = document.getElementById('asset-form-anchor');
+                    if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 100);
+            </script>
+            """, height=0)
+            st.session_state.scroll_to_form = False
+
         # 使用容器突出显示表单
         with st.container():
+            # 添加锚点用于JavaScript滚动
+            st.markdown('<div id="asset-form-anchor"></div>', unsafe_allow_html=True)
+
             st.markdown("### 📝 添加/编辑资产")
 
             # 关闭表单按钮
@@ -681,6 +698,7 @@ def render_config_manager():
                 if st.button(f"✏️ 编辑", key=f"edit_{idx}", use_container_width=True):
                     st.session_state.show_add_form = True
                     st.session_state.editing_index = idx
+                    st.session_state.scroll_to_form = True
                     st.rerun()
 
     st.markdown("---")
@@ -698,6 +716,7 @@ def render_config_manager():
         if st.button("➕ 添加资产", type="primary", use_container_width=True):
             st.session_state.show_add_form = True
             st.session_state.editing_index = None
+            st.session_state.scroll_to_form = True
             st.rerun()
 
     with col2:
