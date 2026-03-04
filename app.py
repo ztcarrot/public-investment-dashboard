@@ -736,11 +736,13 @@ def main():
             key="page_navigation"
         )
 
-        # 更新当前页面状态
-        if page == "📊 数据看板":
+        # 更新当前页面状态（只在用户手动选择时更新）
+        if page == "📊 数据看板" and st.session_state.get('current_page') != 'dashboard':
             st.session_state.current_page = 'dashboard'
-        elif page == "⚙️ 配置管理":
+            st.rerun()
+        elif page == "⚙️ 配置管理" and st.session_state.get('current_page') != 'config':
             st.session_state.current_page = 'config'
+            st.rerun()
 
     # 根据选择的页面显示不同内容
     if st.session_state.current_page == 'config':
