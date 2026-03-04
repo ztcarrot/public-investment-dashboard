@@ -177,6 +177,27 @@ def render_total_assets_chart(portfolio_data):
             max_drawdown_start = portfolio_data.iloc[peak_idx]['日期']
             max_drawdown_end = portfolio_data.iloc[i]['日期']
 
+    # 计算最长不增长时间区间（从峰值到创新高的最长时间）
+    max_recovery_days = 0
+    max_recovery_start = None
+    max_recovery_end = None
+    peak_idx = 0
+
+    for i in range(1, len(portfolio_data)):
+        current_value = total_assets.iloc[i]
+
+        # 如果当前值超过了之前的峰值，检查恢复时间
+        if current_value > total_assets.iloc[peak_idx]:
+            recovery_days = i - peak_idx
+            if recovery_days > max_recovery_days:
+                max_recovery_days = recovery_days
+                max_recovery_start = portfolio_data.iloc[peak_idx]['日期']
+                max_recovery_end = portfolio_data.iloc[i]['日期']
+            peak_idx = i
+
+    max_recovery_start_str = format_date(max_recovery_start) if max_recovery_start is not None else None
+    max_recovery_end_str = format_date(max_recovery_end) if max_recovery_end is not None else None
+
     max_drawdown_start_str = format_date(max_drawdown_start) if max_drawdown_start is not None else None
     max_drawdown_end_str = format_date(max_drawdown_end) if max_drawdown_end is not None else None
 
@@ -280,8 +301,28 @@ def render_total_assets_chart(portfolio_data):
             annotation_font_color="red"
         )
 
+    # 添加最长恢复期矩形标注
+    if max_recovery_days > 0 and max_recovery_start and max_recovery_end:
+        # 找到恢复期的开始和结束索引
+        recovery_start_idx = portfolio_data[portfolio_data['日期'] == max_recovery_start].index[0]
+        recovery_end_idx = portfolio_data[portfolio_data['日期'] == max_recovery_end].index[0]
+
+        # 添加矩形标注（绿色半透明）
+        fig.add_vrect(
+            x0=max_recovery_start,
+            x1=max_recovery_end,
+            fillcolor="rgba(0, 200, 0, 0.15)",
+            layer="below",
+            line_width=2,
+            line=dict(color="green", dash="dash"),
+            annotation_text=f"最长恢复期: {max_recovery_days}天",
+            annotation_position="bottom left",
+            annotation_font_size=12,
+            annotation_font_color="green"
+        )
+
     fig.update_layout(
-        title="总资产走势（含最大回撤区间）",
+        title="总资产走势（含最大回撤和最长恢复期）",
         xaxis_title="日期",
         yaxis_title="总资产（元）",
         hovermode='x unified',
@@ -317,27 +358,6 @@ def render_total_assets_chart(portfolio_data):
             total_days = 0
 
     cagr = calculate_cagr(first_value, last_value, total_days)
-
-    # 计算最长不增长时间区间（从峰值到创新高的最长时间）
-    max_recovery_days = 0
-    max_recovery_start = None
-    max_recovery_end = None
-    peak_idx = 0
-
-    for i in range(1, len(portfolio_data)):
-        current_value = total_assets.iloc[i]
-
-        # 如果当前值超过了之前的峰值，检查恢复时间
-        if current_value > total_assets.iloc[peak_idx]:
-            recovery_days = i - peak_idx
-            if recovery_days > max_recovery_days:
-                max_recovery_days = recovery_days
-                max_recovery_start = portfolio_data.iloc[peak_idx]['日期']
-                max_recovery_end = portfolio_data.iloc[i]['日期']
-            peak_idx = i
-
-    max_recovery_start_str = format_date(max_recovery_start) if max_recovery_start is not None else None
-    max_recovery_end_str = format_date(max_recovery_end) if max_recovery_end is not None else None
 
     # 显示统计信息
     st.markdown("### 📊 统计摘要")
