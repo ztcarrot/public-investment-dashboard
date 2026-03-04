@@ -831,7 +831,7 @@ def main():
             # 隐藏金额，只显示百分比变化
             st.metric(
                 "当前总金额",
-                "---",
+                "******",
                 delta=f"{total_stats['daily_change']:+.2f}%" if total_stats['daily_change'] is not None else None,
                 help="相比前一天的涨跌幅"
             )
@@ -883,7 +883,7 @@ def main():
             else:
                 st.metric(
                     "总金额",
-                    "---",
+                    "******",
                     delta=f"{asset_stats['daily_change']:+.2f}%" if asset_stats and asset_stats['daily_change'] is not None else None
                 )
 
