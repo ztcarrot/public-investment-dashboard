@@ -29,11 +29,12 @@ st.set_page_config(
 )
 
 
-@st.cache_data(ttl=3600)
 def load_data(date_range="最近90天", custom_days=None):
     """加载或抓取数据"""
-    # 添加缓存键，包含date_range和custom_days
-    cache_key = f"{date_range}_{custom_days}"
+    # 手动缓存管理
+    cache_key = f"data_cache_{date_range}_{custom_days}"
+    if cache_key in st.session_state:
+        return st.session_state[cache_key]
 
     assets = st.session_state.get('assets', [])
 
@@ -66,6 +67,9 @@ def load_data(date_range="最近90天", custom_days=None):
 
     # 生成组合数据
     portfolio_data = fetcher.get_portfolio_summary(historical_data)
+
+    # 保存到缓存
+    st.session_state[cache_key] = (historical_data, portfolio_data)
 
     return historical_data, portfolio_data
 
@@ -841,7 +845,10 @@ def main():
 
     with col2:
         if st.button("🔄 刷新数据", type="primary"):
-            st.cache_data.clear()
+            # 只清除数据缓存，不清除日期选择
+            keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
+            for key in keys_to_remove:
+                del st.session_state[key]
             st.rerun()
 
     with col3:
