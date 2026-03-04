@@ -10,6 +10,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import logging
+import os
+from pathlib import Path
 
 from utils.data_fetcher import DataFetcher
 from utils.config_manager import get_default_assets, parse_secrets_assets, validate_asset
@@ -18,6 +20,44 @@ import json
 
 # 配置日志
 logger = logging.getLogger(__name__)
+
+# 日期配置文件路径
+DATE_CONFIG_FILE = Path(__file__).parent / "data" / "date_config.json"
+
+
+def load_date_config():
+    """从文件加载日期配置"""
+    try:
+        if DATE_CONFIG_FILE.exists():
+            with open(DATE_CONFIG_FILE, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                date_str = config.get('start_date')
+                if date_str:
+                    return datetime.strptime(date_str, '%Y-%m-%d').date()
+    except Exception as e:
+        logger.warning(f"加载日期配置失败: {e}")
+    return None
+
+
+def save_date_config(date):
+    """保存日期配置到文件"""
+    try:
+        # 确保data目录存在
+        DATE_CONFIG_FILE.parent.mkdir(exist_ok=True)
+
+        config = {
+            'start_date': date.strftime('%Y-%m-%d'),
+            'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+
+        with open(DATE_CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+
+        logger.info(f"日期配置已保存: {date}")
+        return True
+    except Exception as e:
+        logger.error(f"保存日期配置失败: {e}")
+        return False
 
 
 # 页面配置
@@ -788,15 +828,17 @@ def main():
     if 'show_numbers' not in st.session_state:
         st.session_state.show_numbers = False
 
-    # 初始化开始日期（与资产配置使用相同的缓存策略）
+    # 初始化开始日期（使用文件持久化）
     if 'start_date' not in st.session_state:
-        # 优先从缓存的session_state加载
-        cached_date = load_from_session('investment_start_date')
-        if cached_date:
-            st.session_state.start_date = cached_date
+        # 优先级：文件 > session_state缓存 > 默认值
+        file_date = load_date_config()
+        if file_date:
+            st.session_state.start_date = file_date
+            logger.info(f"从文件加载日期配置: {file_date}")
         else:
             # 使用默认值 2025-01-01
             st.session_state.start_date = datetime(2025, 1, 1).date()
+            logger.info("使用默认日期: 2025-01-01")
 
     # 侧边栏页面导航
     with st.sidebar:
@@ -867,10 +909,11 @@ def main():
             key="start_date_input"
         )
 
-        # 如果用户改变了日期，保存到session_state（缓存）
+        # 如果用户改变了日期，保存到文件和session_state
         if selected_date != saved_date:
             st.session_state.start_date = selected_date
-            save_to_session('investment_start_date', selected_date)
+            save_date_config(selected_date)  # 保存到文件（持久化）
+            save_to_session('investment_start_date', selected_date)  # 保存到session_state（会话内）
             st.rerun()
 
     st.markdown("---")
