@@ -10,54 +10,15 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import logging
-import os
-from pathlib import Path
 
 from utils.data_fetcher import DataFetcher
 from utils.config_manager import get_default_assets, parse_secrets_assets, validate_asset
 from utils.local_storage import save_to_session, load_from_session
+from utils.date_config import date_config_manager
 import json
 
 # 配置日志
 logger = logging.getLogger(__name__)
-
-# 日期配置文件路径
-DATE_CONFIG_FILE = Path(__file__).parent / "data" / "date_config.json"
-
-
-def load_date_config():
-    """从文件加载日期配置"""
-    try:
-        if DATE_CONFIG_FILE.exists():
-            with open(DATE_CONFIG_FILE, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-                date_str = config.get('start_date')
-                if date_str:
-                    return datetime.strptime(date_str, '%Y-%m-%d').date()
-    except Exception as e:
-        logger.warning(f"加载日期配置失败: {e}")
-    return None
-
-
-def save_date_config(date):
-    """保存日期配置到文件"""
-    try:
-        # 确保data目录存在
-        DATE_CONFIG_FILE.parent.mkdir(exist_ok=True)
-
-        config = {
-            'start_date': date.strftime('%Y-%m-%d'),
-            'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        }
-
-        with open(DATE_CONFIG_FILE, 'w', encoding='utf-8') as f:
-            json.dump(config, f, ensure_ascii=False, indent=2)
-
-        logger.info(f"日期配置已保存: {date}")
-        return True
-    except Exception as e:
-        logger.error(f"保存日期配置失败: {e}")
-        return False
 
 
 # 页面配置
@@ -831,7 +792,7 @@ def main():
     # 初始化开始日期（使用文件持久化）
     if 'start_date' not in st.session_state:
         # 优先级：文件 > session_state缓存 > 默认值
-        file_date = load_date_config()
+        file_date = date_config_manager.load()
         if file_date:
             st.session_state.start_date = file_date
             logger.info(f"从文件加载日期配置: {file_date}")
@@ -912,7 +873,7 @@ def main():
         # 如果用户改变了日期，保存到文件和session_state
         if selected_date != saved_date:
             st.session_state.start_date = selected_date
-            save_date_config(selected_date)  # 保存到文件（持久化）
+            date_config_manager.save(selected_date)  # 保存到文件（持久化）
             save_to_session('investment_start_date', selected_date)  # 保存到session_state（会话内）
             st.rerun()
 

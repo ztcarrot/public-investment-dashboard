@@ -52,3 +52,4 @@ config/secrets.toml
 temp/
 *.tmp
 *.bak
+data/date_config.json
