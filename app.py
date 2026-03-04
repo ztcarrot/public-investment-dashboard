@@ -29,14 +29,14 @@ st.set_page_config(
 )
 
 
-def load_data(date_range="最近90天", custom_days=None, custom_date_str=None):
-    """加载或抓取数据"""
-    # 手动缓存管理
-    # 对于自定义日期，使用日期字符串作为key的一部分而不是天数差
-    if date_range == "自定义日期" and custom_date_str:
-        cache_key = f"data_cache_custom_{custom_date_str}"
-    else:
-        cache_key = f"data_cache_{date_range}"
+def load_data(start_date_str):
+    """加载或抓取数据
+
+    Args:
+        start_date_str: 开始日期字符串，格式 'YYYY-MM-DD'
+    """
+    # 手动缓存管理 - 使用日期作为缓存key
+    cache_key = f"data_cache_{start_date_str}"
 
     if cache_key in st.session_state:
         return st.session_state[cache_key]
@@ -46,23 +46,16 @@ def load_data(date_range="最近90天", custom_days=None, custom_date_str=None):
     if not assets:
         return None, None
 
-    # 根据选择计算日期范围
-    days_map = {
-        "最近90天": 90,
-        "最近180天": 180,
-        "最近365天": 365
-    }
-
-    if date_range == "自定义日期" and custom_days is not None:
-        days = custom_days
-    else:
-        days = days_map.get(date_range, 90)
-
+    # 计算日期范围
     end_date = datetime.now().strftime('%Y-%m-%d')
-    start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+    start_date = start_date_str
 
     # 抓取数据
     fetcher = DataFetcher()
+
+    # 计算天数用于显示
+    start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+    days = (datetime.now() - start_dt).days
 
     with st.spinner(f"🔄 正在抓取最近{days}天数据..."):
         historical_data = fetcher.fetch_all_assets_data(assets, start_date, end_date)
@@ -795,14 +788,15 @@ def main():
     if 'show_numbers' not in st.session_state:
         st.session_state.show_numbers = False
 
-    # 初始化日期范围选择
-    if 'selected_date_range' not in st.session_state:
-        st.session_state.selected_date_range = "最近365天"
-
-    # 初始化自定义日期
-    if 'custom_start_date' not in st.session_state:
-        default_date_dt = datetime.now() - timedelta(days=365)
-        st.session_state.custom_start_date = default_date_dt.date()
+    # 初始化开始日期（与资产配置使用相同的缓存策略）
+    if 'start_date' not in st.session_state:
+        # 优先从缓存的session_state加载
+        cached_date = load_from_session('investment_start_date')
+        if cached_date:
+            st.session_state.start_date = cached_date
+        else:
+            # 使用默认值 2025-01-01
+            st.session_state.start_date = datetime(2025, 1, 1).date()
 
     # 侧边栏页面导航
     with st.sidebar:
@@ -862,52 +856,28 @@ def main():
             st.rerun()
 
     with col3:
-        # 日期范围选择
-        date_range_options = ["最近90天", "最近180天", "最近365天", "自定义日期"]
+        # 日期选择器
+        saved_date = st.session_state.start_date
 
-        # 确保保存的值在选项列表中
-        if st.session_state.selected_date_range not in date_range_options:
-            st.session_state.selected_date_range = "最近365天"
-
-        # 使用无key的selectbox，每次都从session_state读取
-        current_index = date_range_options.index(st.session_state.selected_date_range)
-        date_range = st.selectbox(
-            "数据范围",
-            options=date_range_options,
-            index=current_index
+        # 日期选择器
+        selected_date = st.date_input(
+            "开始日期",
+            value=saved_date,
+            max_value=datetime.now().date(),
+            key="start_date_input"
         )
 
-        # 如果用户改变了选择，更新session_state
-        if date_range != st.session_state.selected_date_range:
-            st.session_state.selected_date_range = date_range
-
-        # 如果选择自定义，显示日期选择器
-        custom_days = None
-        custom_date_str = None
-        if date_range == "自定义日期":
-            # 确保是date类型
-            saved_date = st.session_state.custom_start_date
-            if isinstance(saved_date, datetime):
-                saved_date = saved_date.date()
-                st.session_state.custom_start_date = saved_date
-
-            # 日期选择器
-            custom_start_date = st.date_input(
-                "选择开始日期",
-                value=saved_date,
-                max_value=datetime.now().date(),
-                key="custom_date_input"
-            )
-
-            # 计算天数并格式化日期字符串（用于缓存key）
-            days_diff = (datetime.now().date() - custom_start_date).days
-            custom_days = days_diff
-            custom_date_str = custom_start_date.strftime('%Y-%m-%d')
+        # 如果用户改变了日期，保存到session_state（缓存）
+        if selected_date != saved_date:
+            st.session_state.start_date = selected_date
+            save_to_session('investment_start_date', selected_date)
+            st.rerun()
 
     st.markdown("---")
 
     # 加载数据
-    historical_data, portfolio_data = load_data(date_range, custom_days, custom_date_str)
+    start_date_str = st.session_state.start_date.strftime('%Y-%m-%d')
+    historical_data, portfolio_data = load_data(start_date_str)
 
     if historical_data is None or portfolio_data is None:
         st.error("❌ 数据加载失败，请检查网络连接或配置")
