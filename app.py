@@ -434,14 +434,28 @@ def render_config_manager():
                 st.error(f"❌ 导入配置失败: {str(e)}")
 
     with col4:
-        if st.button("🔄 使用默认配置", type="secondary"):
-            default_assets = get_default_assets()
-            st.session_state.assets = default_assets
-            save_to_session('investment_assets', default_assets)
+        if st.button("🔄 重置配置", type="secondary"):
+            # 清除session_state中的配置
+            if 'investment_assets' in st.session_state:
+                del st.session_state['investment_assets']
+            if 'assets' in st.session_state:
+                del st.session_state['assets']
+
+            # 重新加载配置（会按优先级：secrets → 默认）
+            assets = load_assets_config()
+            st.session_state.assets = assets
+            save_to_session('investment_assets', assets)
+
             # 清除缓存并跳转到首页
             st.cache_data.clear()
+
+            # 显示来源信息
+            if hasattr(st, 'secrets') and 'assets' in st.secrets:
+                st.success(f"✅ 已从 secrets.toml 重新加载配置（{len(assets)} 个资产）")
+            else:
+                st.success(f"✅ 已重置为默认配置（{len(assets)} 个资产）")
+
             st.session_state.current_page = 'dashboard'
-            st.success("✅ 已切换到默认配置（4个资产）")
             st.rerun()
 
     st.markdown("---")
