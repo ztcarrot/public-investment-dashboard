@@ -848,9 +848,13 @@ def main():
         # 日期范围选择
         date_range_options = ["最近90天", "最近180天", "最近365天", "自定义日期"]
 
+        # 显示调试信息
+        st.caption(f"🔍 调试: selected_date_range = {st.session_state.get('selected_date_range', 'NOT_SET')}")
+
         # 确保保存的值在选项列表中
         if st.session_state.selected_date_range not in date_range_options:
             st.session_state.selected_date_range = "最近365天"
+            logger.warning(f"selected_date_range不在选项中，重置为365天")
 
         # 使用无key的selectbox，每次都从session_state读取
         current_index = date_range_options.index(st.session_state.selected_date_range)
