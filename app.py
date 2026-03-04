@@ -841,20 +841,30 @@ def main():
         # 日期范围选择
         date_range = st.selectbox(
             "数据范围",
-            options=["最近90天", "最近180天", "最近365天", "自定义"],
+            options=["最近90天", "最近180天", "最近365天", "自定义日期"],
             index=2  # 默认选择365天
         )
 
-        # 如果选择自定义，显示天数输入框
-        if date_range == "自定义":
-            custom_days = st.number_input(
-                "输入天数",
-                min_value=1,
-                max_value=3650,  # 最多10年
-                value=365,
-                step=1,
-                key="custom_days_input"
+        # 如果选择自定义，显示日期选择器
+        if date_range == "自定义日期":
+            # 从session_state获取之前选择的日期，如果没有则默认365天前
+            if 'custom_start_date' not in st.session_state:
+                default_date = datetime.now() - timedelta(days=365)
+                st.session_state.custom_start_date = default_date
+
+            custom_start_date = st.date_input(
+                "选择开始日期",
+                value=st.session_state.custom_start_date,
+                max_value=datetime.now().date(),
+                key="custom_date_input"
             )
+
+            # 保存到session_state
+            st.session_state.custom_start_date = custom_start_date
+
+            # 计算天数
+            days_diff = (datetime.now().date() - custom_start_date).days
+            custom_days = days_diff
         else:
             custom_days = None
 
