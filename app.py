@@ -405,30 +405,80 @@ def render_config_manager():
 
         ### 如何保存配置？
 
-        点击下方 **📤 复制配置链接** 按钮，将配置网址保存到粘贴板，然后：
-        - 保存为浏览器书签
-        - 发送给其他人
-        - 记录在笔记中
+        **方式一：复制配置链接**（推荐）
+        - 点击下方按钮尝试自动复制
+        - 如果自动复制失败，可以手动选中下方链接框中的内容复制
+
+        **方式二：保存为书签**
+        - 按 `Ctrl+D`（Mac: `Cmd+D`）将当前页面保存为书签
+
+        **方式三：手动复制网址**
+        - 在浏览器地址栏中复制完整网址
         """)
 
-        # 分享按钮
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            # 使用 JavaScript 复制当前 URL 到粘贴板
-            copy_button = st.button("📤 复制配置链接", type="primary", use_container_width=True)
-            if copy_button:
-                js_code = """
-                <script>
+        st.markdown("---")
+
+        # 显示当前配置 URL
+        st.markdown("#### 📋 您的配置链接")
+
+        # 获取当前查询参数
+        query_params = st.query_params
+        params_list = []
+        if 'date' in query_params:
+            params_list.append(f"date={query_params['date']}")
+        if 'assets' in query_params:
+            params_list.append(f"assets={query_params['assets']}")
+
+        base_url = "https://your-app.streamlit.app"  # 实际部署时需要替换
+        if params_list:
+            config_url = f"{base_url}/?{'&'.join(params_list)}"
+        else:
+            config_url = base_url + "/"
+
+        # 提示信息
+        st.info("💡 提示：请从浏览器地址栏复制完整网址，或者使用下方按钮尝试自动复制")
+
+        # 显示 URL 供手动复制
+        st.text_area(
+            "配置链接（可手动复制）",
+            value="👆 请从浏览器地址栏复制当前页面的完整网址",
+            height=80,
+            key="config_url_display",
+            help="完整网址包含您的所有配置信息"
+        )
+
+        # 复制按钮（使用改进的 JavaScript）
+        if st.button("📤 尝试自动复制配置链接", type="primary", use_container_width=True):
+            # 使用改进的 JavaScript 代码
+            js_code = """
+            <script>
+            (function() {
                 const currentUrl = window.location.href;
-                navigator.clipboard.writeText(currentUrl).then(() => {
-                    alert('✅ 配置链接已复制到粘贴板！');
-                }).catch(err => {
+                const textarea = document.createElement('textarea');
+                textarea.value = currentUrl;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                textarea.setSelectionRange(0, 99999);
+
+                try {
+                    const successful = document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    if (successful) {
+                        alert('✅ 配置链接已复制到粘贴板！');
+                    } else {
+                        alert('⚠️ 自动复制失败，请手动从浏览器地址栏复制网址');
+                    }
+                } catch (err) {
+                    document.body.removeChild(textarea);
                     console.error('复制失败:', err);
-                    alert('❌ 复制失败，请手动复制网址');
-                });
-                </script>
-                """
-                st.components.v1.html(js_code, height=0)
+                    alert('⚠️ 自动复制失败，请手动从浏览器地址栏复制网址');
+                }
+            })();
+            </script>
+            """
+            st.components.v1.html(js_code, height=0)
 
     st.markdown("---")
 
