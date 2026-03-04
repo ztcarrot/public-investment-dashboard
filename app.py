@@ -849,15 +849,17 @@ def main():
         if st.session_state.selected_date_range not in date_range_options:
             st.session_state.selected_date_range = "最近365天"
 
+        # 使用无key的selectbox，每次都从session_state读取
+        current_index = date_range_options.index(st.session_state.selected_date_range)
         date_range = st.selectbox(
             "数据范围",
             options=date_range_options,
-            index=date_range_options.index(st.session_state.selected_date_range),
-            key="date_range_selector"
+            index=current_index
         )
 
-        # 更新session_state
-        st.session_state.selected_date_range = date_range
+        # 如果用户改变了选择，更新session_state
+        if date_range != st.session_state.selected_date_range:
+            st.session_state.selected_date_range = date_range
 
         # 如果选择自定义，显示日期选择器
         custom_days = None
@@ -873,21 +875,24 @@ def main():
                 saved_date = saved_date.date()
                 st.session_state.custom_start_date = saved_date
 
-            # 日期选择器
+            # 日期选择器（无key，避免状态管理冲突）
             custom_start_date = st.date_input(
                 "选择开始日期",
                 value=saved_date,
-                max_value=datetime.now().date(),
-                key="custom_date_picker"
+                max_value=datetime.now().date()
             )
 
             # 每次都更新session_state
             if custom_start_date != st.session_state.custom_start_date:
                 st.session_state.custom_start_date = custom_start_date
+                logger.info(f"更新自定义日期: {custom_start_date}")
 
             # 计算天数
             days_diff = (datetime.now().date() - custom_start_date).days
             custom_days = days_diff
+
+            # 显示调试信息
+            st.caption(f"💾 已保存: {st.session_state.custom_start_date}")
 
     st.markdown("---")
 
