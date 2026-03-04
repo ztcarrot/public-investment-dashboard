@@ -4,9 +4,10 @@
 资产配置管理模块
 
 支持多种存储方式：
-1. 本地文件存储（用于本地开发，用户自定义的资产）
-2. Streamlit Secrets（用于部署者配置的默认资产）
-3. 默认配置（后备方案）
+1. URL 查询参数（Streamlit Cloud 多用户部署，每个用户独立）
+2. 本地文件存储（用于本地开发，用户自定义的资产）
+3. Streamlit Secrets（用于部署者配置的默认资产）
+4. 默认配置（后备方案）
 """
 
 import streamlit as st
@@ -29,7 +30,7 @@ class AssetsConfigManager:
         """
         加载资产配置
 
-        优先级：session_state > 文件 > secrets > 默认
+        优先级：session_state > URL参数 > 文件 > secrets > 默认
 
         Args:
             secrets_assets: 从 secrets.toml 加载的资产
@@ -45,20 +46,28 @@ class AssetsConfigManager:
                 logger.debug(f"从 session_state 加载资产配置: {len(assets)} 个")
                 return assets
 
-        # 2. 尝试从文件加载（用户自定义的持久化配置）
+        # 2. 尝试从 URL 参数加载（多用户独立）
+        from utils.url_config import url_config_manager
+        url_assets = url_config_manager.load_assets()
+        if url_assets and len(url_assets) > 0:
+            logger.info(f"从 URL 加载资产配置: {len(url_assets)} 个")
+            st.session_state.assets = url_assets
+            return url_assets
+
+        # 3. 尝试从文件加载（用户自定义的持久化配置）
         file_assets = self._load_from_file()
         if file_assets and len(file_assets) > 0:
             logger.info(f"从文件加载用户资产配置: {len(file_assets)} 个")
             st.session_state.assets = file_assets
             return file_assets
 
-        # 3. 使用 secrets.toml 的配置（部署者配置的默认资产）
+        # 4. 使用 secrets.toml 的配置（部署者配置的默认资产）
         if secrets_assets and len(secrets_assets) > 0:
             logger.info(f"使用 secrets.toml 资产配置: {len(secrets_assets)} 个")
             st.session_state.assets = secrets_assets
             return secrets_assets
 
-        # 4. 使用默认配置
+        # 5. 使用默认配置
         if default_assets:
             logger.info(f"使用默认资产配置: {len(default_assets)} 个")
             st.session_state.assets = default_assets
@@ -86,10 +95,14 @@ class AssetsConfigManager:
             # 保存到 session_state（当前会话）
             st.session_state.assets = assets
 
-            # 保存到文件（持久化）
+            # 保存到 URL 参数（多用户独立，主要存储）
+            from utils.url_config import url_config_manager
+            url_config_manager.save_assets(assets)
+
+            # 保存到文件（持久化，后备存储）
             self._save_to_file(assets)
 
-            # 保存到 localStorage（浏览器存储，每用户独立）
+            # 保存到 localStorage（浏览器存储，辅助）
             self._save_to_localstorage(assets)
 
             logger.info(f"资产配置已保存: {len(assets)} 个资产")

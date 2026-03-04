@@ -4,8 +4,9 @@
 日期配置管理模块
 
 支持多种存储方式：
-1. 本地文件存储（用于本地开发）
-2. 浏览器 localStorage（用于 Streamlit Cloud 多用户部署）
+1. URL 查询参数（Streamlit Cloud 多用户部署，每个用户独立）
+2. 本地文件存储（用于本地开发）
+3. 浏览器 localStorage（补充存储，刷新时恢复）
 """
 
 import streamlit as st
@@ -29,28 +30,33 @@ class DateConfigManager:
         """
         加载日期配置
 
-        优先级：session_state > localStorage > 文件 > 默认值
+        优先级：session_state > URL参数 > 文件 > 默认值
         """
         # 1. 优先从 session_state 加载（当前会话）
         if 'start_date' in st.session_state:
             logger.debug(f"从 session_state 加载日期: {st.session_state.start_date}")
             return st.session_state.start_date
 
-        # 2. 尝试从 localStorage 加载（Streamlit Cloud 多用户）
-        localStorage_result = self._load_from_localstorage()
-        if localStorage_result:
-            logger.info(f"从 localStorage 加载日期: {localStorage_result}")
-            return localStorage_result
+        # 2. 尝试从 URL 参数加载（多用户独立）
+        from utils.url_config import url_config_manager
+        url_result = url_config_manager.load_date()
+        if url_result:
+            logger.info(f"从 URL 加载日期: {url_result}")
+            st.session_state.start_date = url_result
+            return url_result
 
         # 3. 尝试从文件加载（本地开发）
         file_result = self._load_from_file()
         if file_result:
             logger.info(f"从文件加载日期: {file_result}")
+            st.session_state.start_date = file_result
             return file_result
 
         # 4. 使用默认值
-        logger.info("使用默认日期: 2025-01-01")
-        return datetime(2025, 1, 1).date()
+        default_date = datetime(2025, 1, 1).date()
+        logger.info(f"使用默认日期: {default_date}")
+        st.session_state.start_date = default_date
+        return default_date
 
     def save(self, date: datetime.date) -> bool:
         """
@@ -66,10 +72,14 @@ class DateConfigManager:
             # 保存到 session_state（当前会话）
             st.session_state.start_date = date
 
-            # 保存到 localStorage（Streamlit Cloud 多用户，每个用户独立）
+            # 保存到 URL 参数（多用户独立，主要存储）
+            from utils.url_config import url_config_manager
+            url_config_manager.save_date(date)
+
+            # 保存到 localStorage（浏览器存储，辅助）
             self._save_to_localstorage(date)
 
-            # 保存到文件（本地开发，单用户）
+            # 保存到文件（本地开发，后备存储）
             self._save_to_file(date)
 
             logger.info(f"日期配置已保存: {date}")
