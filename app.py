@@ -158,51 +158,6 @@ def render_allocation_chart(portfolio_data):
     if portfolio_data is None or portfolio_data.empty:
         return
 
-    st.subheader("当前资产配置（最新一天）")
-
-    # 创建子图 - 饼图
-    fig_pie = make_subplots(
-        rows=1, cols=2,
-        subplot_titles=('资产金额分布', '资产占比分布'),
-        specs=[[{'type': 'pie'}, {'type': 'pie'}]]
-    )
-
-    latest = portfolio_data.iloc[-1]
-
-    # 资产金额饼图
-    fig_pie.add_trace(
-        go.Pie(
-            labels=['股票', '黄金', '现金', '国债'],
-            values=[latest['股票'], latest['黄金'], latest['现金'], latest['国债']],
-            name="金额",
-            textinfo='label+percent',
-            texttemplate='%{label}<br>¥%{value:,.0f}<br>(%{percent})'
-        ),
-        row=1, col=1
-    )
-
-    # 资产占比饼图
-    fig_pie.add_trace(
-        go.Pie(
-            labels=['股票', '黄金', '现金', '国债'],
-            values=[latest['股票占比'], latest['黄金占比'], latest['现金占比'], latest['国债占比']],
-            name="占比",
-            textinfo='label+percent',
-            texttemplate='%{label}<br>%{percent}'
-        ),
-        row=1, col=2
-    )
-
-    fig_pie.update_layout(
-        template='plotly_white',
-        height=400,
-        showlegend=False
-    )
-
-    st.plotly_chart(fig_pie, use_container_width=True)
-
-    st.markdown("---")
-
     st.subheader("资产配置趋势")
 
     # 占比堆叠面积图
@@ -244,6 +199,8 @@ def render_allocation_chart(portfolio_data):
         change = last_val - first_val
         change_str = f"({change:+.2f}%)" if change != 0 else ""
         st.caption(f"  **{asset_type}**: {first_val:.2f}% → {last_val:.2f}% {change_str}")
+
+    st.markdown("---")
 
     # 金额堆叠面积图
     fig_amount = go.Figure()
@@ -786,7 +743,7 @@ def main():
         date_range = st.selectbox(
             "数据范围",
             options=["最近90天", "最近180天", "最近365天"],
-            index=0
+            index=2  # 默认选择365天
         )
 
     st.markdown("---")
