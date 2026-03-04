@@ -369,6 +369,11 @@ class DataFetcher:
         # 特殊处理19789（25特国06）
         if code == '19789' or code == '019789':
             history = self.get_bond_19789_historical(start_date, end_date)
+        elif code_type == '债券':
+            # 债券型基金（如005350）使用基金API获取净值
+            # 注意：19789特殊国债已经在上面处理过了
+            fetch_code = code.zfill(6) if len(code) < 6 else code
+            history = self.get_fund_historical_from_eastmoney(fetch_code, start_date, end_date)
         elif code_type == '场内ETF':
             # 场内ETF需要特殊处理
             # 国债ETF（如511130）、黄金ETF（如518660）应该用新浪API获取交易价格，而不是基金净值
@@ -386,9 +391,6 @@ class DataFetcher:
         elif code_type == '股票':
             # 股票 → 东方财富股票API
             history = self.get_stock_historical_from_eastmoney(code, start_date, end_date)
-        elif code_type == '债券':
-            # 债券 → 债券API
-            history = self.get_bond_19789_historical(start_date, end_date)
         else:
             # 默认使用东方财富基金API
             fetch_code = code.zfill(6) if len(code) < 6 else code
