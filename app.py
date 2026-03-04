@@ -779,12 +779,23 @@ def load_assets_config():
 def main():
     """主函数"""
 
-    # 调试信息：显示所有session_state
-    if st.checkbox("显示所有session_state", key="debug_session"):
-        st.write("Session State Keys:", list(st.session_state.keys()))
-        for key, value in st.session_state.items():
-            if not key.startswith('_'):  # 不显示内部变量
-                st.write(f"{key}: {value}")
+    # 调试信息：显示关键session_state
+    with st.expander("🔧 调试信息", expanded=False):
+        st.write("**Session State 状态:**")
+        st.write(f"- selected_date_range: `{st.session_state.get('selected_date_range', 'NOT_SET')}`")
+        st.write(f"- custom_start_date: `{st.session_state.get('custom_start_date', 'NOT_SET')}`")
+        st.write(f"- 当前页面: `{st.session_state.get('current_page', 'NOT_SET')}`")
+
+        # 显示初始化状态
+        if 'selected_date_range' in st.session_state:
+            st.success("✅ selected_date_range 已初始化")
+        else:
+            st.error("❌ selected_date_range 未初始化")
+
+        if 'custom_start_date' in st.session_state:
+            st.success("✅ custom_start_date 已设置")
+        else:
+            st.error("❌ custom_start_date 未设置")
 
     # 初始化session state
     if 'assets' not in st.session_state:
@@ -800,14 +811,11 @@ def main():
     # 初始化日期范围选择（只在第一次运行时）
     if 'selected_date_range' not in st.session_state:
         st.session_state.selected_date_range = "最近365天"
-        logger.info("✅ 初始化selected_date_range为最近365天")
-    else:
-        logger.info(f"✅ 从session_state恢复selected_date_range: {st.session_state.selected_date_range}")
 
-    if 'custom_start_date' in st.session_state:
-        logger.info(f"✅ custom_start_date存在: {st.session_state.custom_start_date}")
-    else:
-        logger.info("❌ custom_start_date不存在")
+    # 初始化自定义日期（如果不存在）
+    if 'custom_start_date' not in st.session_state and st.session_state.get('selected_date_range') == '自定义日期':
+        default_date = datetime.now() - timedelta(days=365)
+        st.session_state.custom_start_date = default_date.date()
 
     # 侧边栏页面导航
     with st.sidebar:
@@ -870,13 +878,9 @@ def main():
         # 日期范围选择
         date_range_options = ["最近90天", "最近180天", "最近365天", "自定义日期"]
 
-        # 显示调试信息
-        st.caption(f"🔍 调试: selected_date_range = {st.session_state.get('selected_date_range', 'NOT_SET')}")
-
         # 确保保存的值在选项列表中
         if st.session_state.selected_date_range not in date_range_options:
             st.session_state.selected_date_range = "最近365天"
-            logger.warning(f"selected_date_range不在选项中，重置为365天")
 
         # 使用无key的selectbox，每次都从session_state读取
         current_index = date_range_options.index(st.session_state.selected_date_range)
@@ -889,7 +893,6 @@ def main():
         # 如果用户改变了选择，更新session_state
         if date_range != st.session_state.selected_date_range:
             st.session_state.selected_date_range = date_range
-            logger.info(f"更新数据范围选择: {date_range}")
 
         # 如果选择自定义，显示日期选择器
         custom_days = None
