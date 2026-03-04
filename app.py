@@ -779,12 +779,88 @@ def load_assets_config():
 def main():
     """主函数"""
 
+    # 注入 JavaScript 来管理 localStorage
+    js_code = """
+    <script>
+    // 保存日期设置到 localStorage
+    function saveDateSettings(dateRange, customDate) {
+        try {
+            localStorage.setItem('investment_dashboard_date_range', dateRange);
+            if (customDate) {
+                localStorage.setItem('investment_dashboard_custom_date', customDate);
+            } else {
+                localStorage.removeItem('investment_dashboard_custom_date');
+            }
+            console.log('设置已保存:', dateRange, customDate);
+        } catch (e) {
+            console.error('保存设置失败:', e);
+        }
+    }
+
+    // 从 localStorage 读取日期设置
+    function loadDateSettings() {
+        try {
+            const dateRange = localStorage.getItem('investment_dashboard_date_range');
+            const customDate = localStorage.getItem('investment_dashboard_custom_date');
+            console.log('从 localStorage 读取:', dateRange, customDate);
+
+            // 通过隐藏的输入框传递数据
+            if (dateRange) {
+                const input1 = document.getElementById('restore_date_range');
+                if (input1) input1.value = dateRange;
+            }
+            if (customDate) {
+                const input2 = document.getElementById('restore_custom_date');
+                if (input2) input2.value = customDate;
+            }
+        } catch (e) {
+            console.error('读取设置失败:', e);
+        }
+    }
+
+    // 页面加载时读取设置
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadDateSettings);
+    } else {
+        loadDateSettings();
+    }
+
+    // 暴露保存函数到全局
+    window.saveDateSettings = saveDateSettings;
+    </script>
+    """
+
+    # 隐藏的输入框用于接收 JavaScript 传递的数据
+    restore_range = st.text_input("恢复日期范围", key="restore_date_range", label_visibility="collapsed")
+    restore_date = st.text_input("恢复自定义日期", key="restore_custom_date", label_visibility="collapsed")
+
+    # 注入 JavaScript
+    st.components.v1.html(js_code)
+
+    # 如果 JavaScript 传递了数据，恢复到 session_state
+    if restore_range:
+        st.session_state.selected_date_range = restore_range
+        logger.info(f"从 localStorage 恢复: selected_date_range={restore_range}")
+
+    if restore_date:
+        from datetime import datetime
+        try:
+            restored_date = datetime.strptime(restore_date, '%Y-%m-%d').date()
+            st.session_state.custom_start_date = restored_date
+            logger.info(f"从 localStorage 恢复: custom_start_date={restored_date}")
+        except:
+            pass
+
     # 调试信息：显示关键session_state
     with st.expander("🔧 调试信息", expanded=False):
         st.write("**Session State 状态:**")
         st.write(f"- selected_date_range: `{st.session_state.get('selected_date_range', 'NOT_SET')}`")
         st.write(f"- custom_start_date: `{st.session_state.get('custom_start_date', 'NOT_SET')}`")
-        st.write(f"- 当前页面: `{st.session_state.get('current_page', 'NOT_SET')}`")
+
+        # 显示 localStorage 状态
+        st.write("**LocalStorage 状态:**")
+        st.write(f"- investment_dashboard_date_range: (浏览器存储)")
+        st.write(f"- investment_dashboard_custom_date: (浏览器存储)")
 
         # 显示初始化状态
         if 'selected_date_range' in st.session_state:
@@ -808,43 +884,30 @@ def main():
     if 'show_numbers' not in st.session_state:
         st.session_state.show_numbers = False
 
-    # 初始化日期范围选择（从文件或默认值）
+    # 初始化日期范围选择
     if 'selected_date_range' not in st.session_state:
         st.session_state.selected_date_range = "最近365天"
-        # 尝试从文件恢复
-        try:
-            import os
-            config_file = 'date_config.json'
-            if os.path.exists(config_file):
-                with open(config_file, 'r') as f:
-                    config = json.load(f)
-                    if 'selected_date_range' in config:
-                        st.session_state.selected_date_range = config['selected_date_range']
-                        st.info(f"✅ 已恢复上次的设置: {config['selected_date_range']}")
-                    if 'custom_start_date' in config:
-                        from datetime import datetime
-                        st.session_state.custom_start_date = datetime.strptime(config['custom_start_date'], '%Y-%m-%d').date()
-        except Exception as e:
-            logger.debug(f"从文件恢复配置失败: {e}")
 
     # 初始化自定义日期
     if 'custom_start_date' not in st.session_state and st.session_state.get('selected_date_range') == '自定义日期':
         default_date = datetime.now() - timedelta(days=365)
         st.session_state.custom_start_date = default_date.date()
 
-    # 保存配置到文件的函数
-    def save_date_config(date_range, custom_date=None):
-        try:
-            config = {'selected_date_range': date_range}
-            if custom_date:
-                config['custom_start_date'] = custom_date.strftime('%Y-%m-%d')
-            with open('date_config.json', 'w') as f:
-                json.dump(config, f)
-        except Exception as e:
-            logger.error(f"保存配置失败: {e}")
+    # 保存配置到 localStorage 的函数
+    def save_to_localstorage(date_range, custom_date=None):
+        date_str = custom_date.strftime('%Y-%m-%d') if custom_date else None
+        js = f"""
+        <script>
+        if (window.saveDateSettings) {{
+            window.saveDateSettings('{date_range}', '{date_str}'');
+        }}
+        </script>
+        """
+        st.components.v1.html(js)
+        logger.info(f"保存到 localStorage: date_range={date_range}, custom_date={date_str}")
 
     # 将函数保存到 session_state 供后续使用
-    st.session_state.save_date_config = save_date_config
+    st.session_state.save_to_localstorage = save_to_localstorage
 
     # 侧边栏页面导航
     with st.sidebar:
@@ -919,11 +982,11 @@ def main():
             index=current_index
         )
 
-        # 如果用户改变了选择，更新session_state并保存
+        # 如果用户改变了选择，更新session_state并保存到localStorage
         if date_range != st.session_state.selected_date_range:
             st.session_state.selected_date_range = date_range
-            # 保存到文件
-            st.session_state.save_date_config(date_range)
+            # 保存到用户的浏览器 localStorage
+            st.session_state.save_to_localstorage(date_range)
 
         # 如果选择自定义，显示日期选择器
         custom_days = None
@@ -942,8 +1005,8 @@ def main():
             # 日期选择器（使用key确保状态正确管理）
             def update_custom_date():
                 st.session_state.custom_start_date = st.session_state.temp_custom_date
-                # 保存到文件
-                st.session_state.save_date_config(st.session_state.selected_date_range, st.session_state.custom_start_date)
+                # 保存到用户的浏览器 localStorage
+                st.session_state.save_to_localstorage(st.session_state.selected_date_range, st.session_state.custom_start_date)
 
             custom_start_date = st.date_input(
                 "选择开始日期",
@@ -953,8 +1016,8 @@ def main():
                 on_change=update_custom_date
             )
 
-            # 显示当前值和保存的值
-            st.caption(f"选择: {custom_start_date} | 💾 已保存到文件")
+            # 显示当前值
+            st.caption(f"💾 选择: {custom_start_date} (已保存到浏览器)")
 
             # 计算天数
             days_diff = (datetime.now().date() - custom_start_date).days
