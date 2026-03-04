@@ -771,7 +771,7 @@ def main():
         return
 
     # 数据抓取按钮
-    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+    col1, col2, col3 = st.columns([2, 1, 1])
 
     with col1:
         st.info(f"📌 当前已配置 {len(assets)} 个资产")
@@ -788,13 +788,6 @@ def main():
             options=["最近90天", "最近180天", "最近365天"],
             index=0
         )
-
-    with col4:
-        # 眼睛按钮：切换显示/隐藏数字
-        eye_icon = "👁️" if st.session_state.show_numbers else "🙈"
-        if st.button(f"{eye_icon} {'隐藏' if st.session_state.show_numbers else '显示'}数字", key="toggle_numbers"):
-            st.session_state.show_numbers = not st.session_state.show_numbers
-            st.rerun()
 
     st.markdown("---")
 
@@ -814,7 +807,7 @@ def main():
 
         # 第一行：总资产信息
         st.markdown("### 💰 总资产概览")
-        col_total1, col_total2, col_total3, col_total4 = st.columns(4)
+        col_total1, col_total2, col_total3, col_total_btn = st.columns([2, 1, 1, 1])
 
         with col_total1:
             st.metric(
@@ -836,11 +829,12 @@ def main():
             else:
                 st.metric("近一月", "暂无数据")
 
-        with col_total4:
-            if total_stats['total_change'] is not None:
-                st.metric("累计涨幅", f"{total_stats['total_change']:+.2f}%", help="相比第一天的累计涨跌幅")
-            else:
-                st.metric("累计涨幅", "暂无数据")
+        with col_total_btn:
+            # 数字显示按钮移到这里
+            eye_icon = "👁️" if st.session_state.show_numbers else "🙈"
+            if st.button(f"{eye_icon} {'隐藏' if st.session_state.show_numbers else '显示'}数字", key="toggle_numbers"):
+                st.session_state.show_numbers = not st.session_state.show_numbers
+                st.rerun()
 
         st.markdown("---")
 
@@ -880,20 +874,35 @@ def main():
                     f"{percentage:.2f}%"
                 )
 
-                # 涨幅详情（使用expander折叠）
-                if asset_stats:
-                    with st.expander("📊 涨幅详情", expanded=False):
+        st.markdown("---")
+
+        # 第三行：统一的涨幅详情折叠面板
+        with st.expander("📊 各资产类型涨幅详情", expanded=False):
+            st.caption("显示各资产类型在不同时间段内的涨跌幅")
+
+            # 使用4列显示
+            detail_cols = st.columns(4)
+            for idx, asset_info in enumerate(asset_types):
+                asset_name = asset_info['name']
+                asset_stats = calculate_change_percentages(portfolio_data, asset_name)
+
+                with detail_cols[idx]:
+                    st.markdown(f"#### {asset_info['icon']} {asset_name}")
+
+                    if asset_stats:
+                        if asset_stats['daily_change'] is not None:
+                            st.metric("日涨幅", f"{asset_stats['daily_change']:+.2f}%")
                         if asset_stats['weekly_change'] is not None:
-                            st.write(f"📅 近一周: **{asset_stats['weekly_change']:+.2f}%**")
+                            st.metric("近一周", f"{asset_stats['weekly_change']:+.2f}%")
                         if asset_stats['monthly_change'] is not None:
-                            st.write(f"📅 近一月: **{asset_stats['monthly_change']:+.2f}%**")
+                            st.metric("近一月", f"{asset_stats['monthly_change']:+.2f}%")
                         if asset_stats['total_change'] is not None:
-                            st.write(f"📅 累计: **{asset_stats['total_change']:+.2f}%**")
+                            st.metric("累计涨幅", f"{asset_stats['total_change']:+.2f}%")
 
         st.markdown("---")
     else:
         # 隐藏数字时显示提示
-        st.info("💡 点击右上角的 🙈 按钮显示资产数据")
+        st.info("💡 点击「🙈 显示数字」按钮查看资产详情")
 
     # 图表
     tab1, tab2, tab3, tab4 = st.tabs(["📈 总资产走势", "🥧 资产配置", "📊 标的表现", "📋 数据表格"])
