@@ -640,6 +640,24 @@ def render_config_manager():
         return
 
     # 显示资产列表
+    # 添加刷新价格按钮
+    col_list, col_refresh = st.columns([5, 1])
+    with col_list:
+        st.subheader("📋 资产配置列表")
+    with col_refresh:
+        if st.button("🔄 刷新价格", key="refresh_prices", use_container_width=True):
+            if 'current_price_cache' in st.session_state:
+                del st.session_state.current_price_cache
+            st.success("✅ 价格缓存已清除，请刷新页面")
+            st.rerun()
+
+    assets = st.session_state.get('assets', [])
+
+    if not assets:
+        st.warning("⚠️ 当前没有配置任何资产，点击上方「➕ 添加资产」开始")
+        return
+
+    # 显示资产列表
     for idx, asset in enumerate(assets):
         shares = asset.get('初始份额', 0)
         code = asset.get('代码')
@@ -647,6 +665,7 @@ def render_config_manager():
 
         # 获取当前价格和金额
         current_amount = None
+        current_price = None
         if shares and shares > 0 and code:
             try:
                 # 从缓存或实时获取当前价格
@@ -659,22 +678,28 @@ def render_config_manager():
                     current_amount = current_price * shares
                 else:
                     # 实时获取价格
-                    fetcher = DataFetcher()
-                    end = datetime.now().strftime('%Y-%m-%d')
-                    start = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+                    with st.spinner(f"获取 {code} 价格中..."):
+                        fetcher = DataFetcher()
+                        end = datetime.now().strftime('%Y-%m-%d')
+                        start = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
 
-                    temp_asset = {
-                        '代码': code,
-                        '代码类型': code_type,
-                        '初始份额': 1.0
-                    }
-                    history = fetcher.fetch_asset_data(temp_asset, start, end)
-                    if not history.empty and '净值' in history.columns:
-                        current_price = history['净值'].iloc[-1]
-                        st.session_state.current_price_cache[cache_key] = current_price
-                        current_amount = current_price * shares
+                        temp_asset = {
+                            '代码': code,
+                            '名称': asset.get('名称', ''),
+                            '代码类型': code_type,
+                            '资产类别': asset.get('资产类别', '股票'),
+                            '初始份额': 1.0
+                        }
+                        history = fetcher.fetch_asset_data(temp_asset, start, end)
+                        if not history.empty and '净值' in history.columns:
+                            current_price = history['净值'].iloc[-1]
+                            st.session_state.current_price_cache[cache_key] = current_price
+                            current_amount = current_price * shares
+                            logger.info(f"获取 {code} 价格成功: {current_price:.4f}")
+                        else:
+                            logger.warning(f"获取 {code} 价格失败: 数据为空")
             except Exception as e:
-                logger.debug(f"获取 {code} 当前价格失败: {e}")
+                logger.error(f"获取 {code} 当前价格失败: {e}")
 
         # 构建显示信息
         holding_display = f"{shares:,.2f} 份" if shares and shares > 0 else "未配置"
@@ -682,7 +707,7 @@ def render_config_manager():
             holding_display += f" ≈ ¥{current_amount:,.2f}"
 
         with st.expander(f"{idx + 1}. {asset['名称']} ({asset['代码']}) - {holding_display}", expanded=False):
-            col_info1, col_info2, col_info3 = st.columns([2, 2, 1])
+            col_info1, col_info2, col_info3, col_info4 = st.columns([2, 2, 1.5, 1])
 
             with col_info1:
                 st.write(f"**代码**: {asset['代码']}")
@@ -700,7 +725,11 @@ def render_config_manager():
                 # 显示当前金额
                 if current_amount:
                     st.metric("当前金额", f"¥{current_amount:,.2f}")
+                elif current_price is not None:
+                    st.metric("当前金额", f"¥{current_price * shares:,.2f}")
 
+            with col_info4:
+                st.markdown("<br>", unsafe_allow_html=True)
                 if st.button(f"✏️ 编辑", key=f"edit_{idx}", use_container_width=True):
                     st.session_state.show_add_form = True
                     st.session_state.editing_index = idx
