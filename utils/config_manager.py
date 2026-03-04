@@ -153,8 +153,3 @@ def validate_asset(asset: Dict) -> tuple[bool, str]:
 
     except Exception as e:
         return False, f"验证过程中发生错误: {str(e)}"
-
-        return True, ""
-
-    except Exception as e:
-        return False, f"验证出错: {str(e)}"

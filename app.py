@@ -755,6 +755,16 @@ def main():
         st.error("❌ 数据加载失败，请检查网络连接或配置")
         return
 
+    # 数字显示/隐藏按钮（始终显示）
+    col_btn = st.columns([1])
+    with col_btn[0]:
+        eye_icon = "👁️" if st.session_state.show_numbers else "🙈"
+        if st.button(f"{eye_icon} {'隐藏' if st.session_state.show_numbers else '显示'}数字", key="toggle_numbers"):
+            st.session_state.show_numbers = not st.session_state.show_numbers
+            st.rerun()
+
+    st.markdown("---")
+
     # 统计卡片（根据状态显示或隐藏）
     if st.session_state.show_numbers:
         latest = portfolio_data.iloc[-1]
@@ -764,7 +774,7 @@ def main():
 
         # 第一行：总资产信息
         st.markdown("### 💰 总资产概览")
-        col_total1, col_total2, col_total3, col_total_btn = st.columns([2, 1, 1, 1])
+        col_total1, col_total2, col_total3 = st.columns(4)
 
         with col_total1:
             st.metric(
@@ -785,13 +795,6 @@ def main():
                 st.metric("近一月", f"{total_stats['monthly_change']:+.2f}%", help="相比30天前的涨跌幅")
             else:
                 st.metric("近一月", "暂无数据")
-
-        with col_total_btn:
-            # 数字显示按钮移到这里
-            eye_icon = "👁️" if st.session_state.show_numbers else "🙈"
-            if st.button(f"{eye_icon} {'隐藏' if st.session_state.show_numbers else '显示'}数字", key="toggle_numbers"):
-                st.session_state.show_numbers = not st.session_state.show_numbers
-                st.rerun()
 
         st.markdown("---")
 
