@@ -898,8 +898,16 @@ def main():
         if date_range == "自定义日期":
             # 初始化自定义日期
             if 'custom_start_date' not in st.session_state:
-                default_date_dt = datetime.now() - timedelta(days=365)
-                st.session_state.custom_start_date = default_date_dt.date()
+                # 优先从URL查询参数加载
+                if 'custom_date' in st.query_params:
+                    try:
+                        st.session_state.custom_start_date = datetime.strptime(st.query_params['custom_date'], '%Y-%m-%d').date()
+                    except:
+                        default_date_dt = datetime.now() - timedelta(days=365)
+                        st.session_state.custom_start_date = default_date_dt.date()
+                else:
+                    default_date_dt = datetime.now() - timedelta(days=365)
+                    st.session_state.custom_start_date = default_date_dt.date()
 
             # 确保是date类型
             saved_date = st.session_state.custom_start_date
@@ -907,25 +915,20 @@ def main():
                 saved_date = saved_date.date()
                 st.session_state.custom_start_date = saved_date
 
-            # 日期选择器（使用key确保状态正确管理）
-            def update_custom_date():
-                st.session_state.custom_start_date = st.session_state.temp_custom_date
-                # 保存到URL查询参数（持久化）
-                date_str = st.session_state.custom_start_date.strftime('%Y-%m-%d')
-                st.query_params['custom_date'] = date_str
-
-            # 确保widget状态与saved_date同步
-            # 如果widget状态存在但与saved_date不同,更新它
-            if 'temp_custom_date' in st.session_state and st.session_state.temp_custom_date != saved_date:
-                st.session_state.temp_custom_date = saved_date
-
+            # 日期选择器（不使用key，直接通过返回值获取用户输入）
             custom_start_date = st.date_input(
                 "选择开始日期",
                 value=saved_date,
-                max_value=datetime.now().date(),
-                key="temp_custom_date",
-                on_change=update_custom_date
+                max_value=datetime.now().date()
             )
+
+            # 如果用户改变了日期，更新session_state和保存到URL
+            if custom_start_date != saved_date:
+                st.session_state.custom_start_date = custom_start_date
+                # 保存到URL查询参数（持久化）
+                date_str = custom_start_date.strftime('%Y-%m-%d')
+                st.query_params['custom_date'] = date_str
+                st.rerun()
 
             # 显示当前值
             st.caption(f"💾 选择: {custom_start_date} (已保存到URL)")
