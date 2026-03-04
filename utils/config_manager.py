@@ -72,12 +72,21 @@ def parse_secrets_assets(assets_data: List[Dict]) -> List[Dict[str, Union[str, f
 
     parsed_assets = []
     for idx, asset in enumerate(assets_data, start=1):
-        try:
-            # 验证资产配置
-            validated_asset = validate_asset(asset)
-            parsed_assets.append(validated_asset)
-        except ValueError as e:
-            raise ValueError(f"第 {idx} 个资产配置无效: {str(e)}")
+        # 验证资产配置
+        is_valid, error_msg = validate_asset(asset)
+        if not is_valid:
+            raise ValueError(f"第 {idx} 个资产配置无效: {error_msg}")
+
+        # 复制资产并移除额外字段（如 '备注'）
+        clean_asset = {
+            '代码': asset.get('代码', ''),
+            '名称': asset.get('名称', ''),
+            '代码类型': asset.get('代码类型', ''),
+            '资产类别': asset.get('资产类别', ''),
+            '初始份额': asset.get('初始份额'),
+            '初始金额': None  # 统一使用初始份额
+        }
+        parsed_assets.append(clean_asset)
 
     return parsed_assets
 
