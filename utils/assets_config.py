@@ -3,18 +3,13 @@
 """
 资产配置管理模块
 
-支持多种存储方式：
-1. URL 查询参数（Streamlit Cloud 多用户部署，每个用户独立）
-2. 本地文件存储（用于本地开发，用户自定义的资产）
-3. Streamlit Secrets（用于部署者配置的默认资产）
-4. 默认配置（后备方案）
+使用 URL 查询参数存储配置，实现真正的多用户隔离。
 """
 
 import streamlit as st
 import json
 import logging
-from pathlib import Path
-from typing import Optional, List, Dict, Union
+from typing import Optional, List, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -23,14 +18,13 @@ class AssetsConfigManager:
     """资产配置管理器"""
 
     def __init__(self):
-        self.file_path = Path(__file__).parent.parent / "data" / "user_assets.json"
         self.storage_key = "investment_user_assets"
 
     def load(self, secrets_assets=None, default_assets=None) -> List[Dict]:
         """
         加载资产配置
 
-        优先级：session_state > URL参数 > 文件 > secrets > 默认
+        优先级：session_state > URL参数 > secrets > 默认
 
         Args:
             secrets_assets: 从 secrets.toml 加载的资产
@@ -54,20 +48,13 @@ class AssetsConfigManager:
             st.session_state.assets = url_assets
             return url_assets
 
-        # 3. 尝试从文件加载（用户自定义的持久化配置）
-        file_assets = self._load_from_file()
-        if file_assets and len(file_assets) > 0:
-            logger.info(f"从文件加载用户资产配置: {len(file_assets)} 个")
-            st.session_state.assets = file_assets
-            return file_assets
-
-        # 4. 使用 secrets.toml 的配置（部署者配置的默认资产）
+        # 3. 使用 secrets.toml 的配置（部署者配置的默认资产）
         if secrets_assets and len(secrets_assets) > 0:
             logger.info(f"使用 secrets.toml 资产配置: {len(secrets_assets)} 个")
             st.session_state.assets = secrets_assets
             return secrets_assets
 
-        # 5. 使用默认配置
+        # 4. 使用默认配置
         if default_assets:
             logger.info(f"使用默认资产配置: {len(default_assets)} 个")
             st.session_state.assets = default_assets
@@ -99,9 +86,6 @@ class AssetsConfigManager:
             from utils.url_config import url_config_manager
             url_config_manager.save_assets(assets)
 
-            # 保存到文件（持久化，后备存储）
-            self._save_to_file(assets)
-
             # 保存到 localStorage（浏览器存储，辅助）
             self._save_to_localstorage(assets)
 
@@ -111,40 +95,8 @@ class AssetsConfigManager:
             logger.error(f"保存资产配置失败: {e}")
             return False
 
-    def _load_from_file(self) -> Optional[List[Dict]]:
-        """从文件加载"""
-        try:
-            if self.file_path.exists():
-                with open(self.file_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    assets = data.get('assets', [])
-                    if assets and len(assets) > 0:
-                        return assets
-        except Exception as e:
-            logger.warning(f"从文件加载资产配置失败: {e}")
-        return None
-
-    def _save_to_file(self, assets: List[Dict]):
-        """保存到文件"""
-        try:
-            # 确保目录存在
-            self.file_path.parent.mkdir(exist_ok=True)
-
-            data = {
-                'assets': assets,
-                'updated_at': st.session_state.get('last_update', 'unknown'),
-                'count': len(assets)
-            }
-
-            with open(self.file_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-
-            logger.debug(f"资产配置已保存到文件: {self.file_path}")
-        except Exception as e:
-            logger.warning(f"保存资产配置到文件失败: {e}")
-
     def _save_to_localstorage(self, assets: List[Dict]):
-        """保存到浏览器 localStorage"""
+        """保存到浏览器 localStorage（辅助存储）"""
         try:
             data = {
                 'assets': assets,
