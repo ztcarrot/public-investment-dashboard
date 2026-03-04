@@ -404,14 +404,14 @@ def render_config_manager():
                 st.error(f"❌ 导入配置失败: {str(e)}")
 
     with col4:
-        if st.button("🔄 重置默认", type="secondary"):
+        if st.button("🔄 使用默认配置", type="secondary"):
             # 使用确认对话框
             if 'confirm_reset' not in st.session_state:
                 st.session_state.confirm_reset = False
 
             if not st.session_state.confirm_reset:
-                st.warning("⚠️ 点击再次确认以恢复默认配置")
-                if st.button("确认重置", key="confirm_reset_btn"):
+                st.warning("⚠️ 将切换到默认的4个资产配置，当前配置将被覆盖")
+                if st.button("确认切换", key="confirm_reset_btn"):
                     st.session_state.confirm_reset = True
                     st.rerun()
             else:
@@ -419,7 +419,7 @@ def render_config_manager():
                 st.session_state.assets = default_assets
                 save_to_session('investment_assets', default_assets)
                 st.session_state.confirm_reset = False
-                st.success("✅ 已恢复默认配置")
+                st.success("✅ 已切换到默认配置（4个资产）")
                 st.rerun()
 
     st.markdown("---")
@@ -543,12 +543,8 @@ def load_assets_config():
         logger.info("从 session_state 加载配置")
         return session_config
 
-    # 2. 尝试从 secrets 加载
-    if hasattr(st, 'secrets') and 'assets' in st.secrets:
-        logger.info("从 secrets.toml 加载配置")
-        return parse_secrets_assets(st.secrets['assets'])
-
-    # 3. 使用默认配置
+    # 2. 默认使用默认配置（4个资产）
+    # 注意：secrets.toml 的配置可以通过"导入配置"功能手动导入
     logger.info("使用默认配置")
     return get_default_assets()
 
