@@ -395,8 +395,14 @@ class DataFetcher:
         # 转换为DataFrame
         df = pd.DataFrame(history)
 
-        # 特殊处理：短债基金（005350）日期增加一天
-        if code == '005350' or code == '5350':
+        # 特殊处理：基金类型日期增加一天
+        # 基金净值通常在交易日收盘后公布，所以数据日期应该是下一个交易日
+        if code_type == '基金':
+            df['日期'] = pd.to_datetime(df['日期']) + timedelta(days=1)
+            df['日期'] = df['日期'].dt.strftime('%Y-%m-%d')
+            logger.info(f"基金 {code} 日期已增加一天")
+        elif code == '005350' or code == '5350':
+            # 兼容旧的短债基金特殊处理
             df['日期'] = pd.to_datetime(df['日期']) + timedelta(days=1)
             df['日期'] = df['日期'].dt.strftime('%Y-%m-%d')
             logger.info(f"短债基金 {code} 日期已增加一天")
