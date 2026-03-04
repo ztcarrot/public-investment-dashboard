@@ -393,18 +393,29 @@ def render_config_manager():
 
     # 添加/编辑资产表单
     if st.session_state.get('show_add_form', False):
-        st.subheader("📝 添加/编辑资产")
+        # 使用容器突出显示表单
+        with st.container():
+            st.markdown("### 📝 添加/编辑资产")
 
-        # 表单
-        editing_index = st.session_state.get('editing_index')
-        is_edit = editing_index is not None
+            # 关闭表单按钮
+            if st.button("❌ 关闭表单", key="close_form"):
+                st.session_state.show_add_form = False
+                st.session_state.editing_index = None
+                st.rerun()
 
-        if is_edit:
-            assets = st.session_state.get('assets', [])
-            current_asset = assets[editing_index]
-            st.info(f"✏️ 正在编辑：{current_asset.get('名称', '未知')}")
-        else:
-            current_asset = {}
+            st.markdown("---")
+
+            # 表单
+            editing_index = st.session_state.get('editing_index')
+            is_edit = editing_index is not None
+
+            if is_edit:
+                assets = st.session_state.get('assets', [])
+                current_asset = assets[editing_index]
+                st.info(f"✏️ 正在编辑：{current_asset.get('名称', '未知')}")
+            else:
+                current_asset = {}
+                st.info("💡 请填写下方表单添加新资产")
 
         with st.form(key="asset_form"):
             col_form1, col_form2 = st.columns(2)
