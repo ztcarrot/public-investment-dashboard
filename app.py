@@ -374,6 +374,7 @@ def render_config_manager():
     # 返回首页按钮
     if st.button("🏠 返回首页", key="back_to_dashboard"):
         st.session_state.current_page = 'dashboard'
+        st.session_state.page_selection = 0
         st.rerun()
 
     st.title("⚙️ 配置管理")
@@ -729,20 +730,26 @@ def main():
     # 侧边栏页面导航
     with st.sidebar:
         st.title("📊 导航")
+
+        # 初始化页面选择
+        if 'page_selection' not in st.session_state:
+            st.session_state.page_selection = 0 if st.session_state.get('current_page') == 'dashboard' else 1
+
+        # 根据current_page更新索引（防止按钮跳转后radio不更新）
+        if st.session_state.get('current_page') == 'dashboard' and st.session_state.page_selection != 0:
+            st.session_state.page_selection = 0
+        elif st.session_state.get('current_page') == 'config' and st.session_state.page_selection != 1:
+            st.session_state.page_selection = 1
+
         page = st.radio(
             "选择页面",
             options=["📊 数据看板", "⚙️ 配置管理"],
-            index=0 if st.session_state.get('current_page') == 'dashboard' else 1,
-            key="page_navigation"
+            index=st.session_state.page_selection
         )
 
-        # 更新当前页面状态（只在用户手动选择时更新）
-        if page == "📊 数据看板" and st.session_state.get('current_page') != 'dashboard':
-            st.session_state.current_page = 'dashboard'
-            st.rerun()
-        elif page == "⚙️ 配置管理" and st.session_state.get('current_page') != 'config':
-            st.session_state.current_page = 'config'
-            st.rerun()
+        # 更新状态
+        st.session_state.page_selection = 0 if page == "📊 数据看板" else 1
+        st.session_state.current_page = 'dashboard' if page == "📊 数据看板" else 'config'
 
     # 根据选择的页面显示不同内容
     if st.session_state.current_page == 'config':
@@ -766,6 +773,7 @@ def main():
     with col1:
         if st.button(f"📌 当前已配置 {len(assets)} 个资产", key="goto_config"):
             st.session_state.current_page = 'config'
+            st.session_state.page_selection = 1
             st.rerun()
 
     with col2:
