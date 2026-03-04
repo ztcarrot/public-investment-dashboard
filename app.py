@@ -479,7 +479,7 @@ def render_config_manager():
                         "初始份额 *",
                         min_value=0.0,
                         step=100.0,
-                        value=float(current_asset.get('初始份额', 0)),
+                        value=float(current_asset.get('初始份额', 0) if current_asset.get('初始份额') is not None else 0.0),
                         format="%.2f",
                         help="输入持有份额"
                     )
@@ -489,7 +489,7 @@ def render_config_manager():
                         "初始金额（元）*",
                         min_value=0.0,
                         step=1000.0,
-                        value=float(current_asset.get('初始金额', 0)),
+                        value=float(current_asset.get('初始金额', 0) if current_asset.get('初始金额') is not None else 0.0),
                         format="%.2f",
                         help="输入初始金额，系统会根据当前价格自动计算份额"
                     )
