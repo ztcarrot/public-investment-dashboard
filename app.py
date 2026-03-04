@@ -616,9 +616,7 @@ def render_config_manager():
             code_data = historical_data[historical_data['代码'] == code]
             if not code_data.empty and '最新价格' in code_data.columns:
                 latest_prices[code] = float(code_data['最新价格'].iloc[-1])
-        if latest_prices:
-            st.success(f"✅ 已从首页数据获取到 {len(latest_prices)} 个资产的最新价格")
-        else:
+        if not latest_prices:
             st.warning("⚠️ 未从首页数据获取到价格信息，请返回首页刷新数据")
 
     # 显示资产列表
