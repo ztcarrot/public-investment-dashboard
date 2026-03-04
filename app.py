@@ -555,6 +555,114 @@ def render_allocation_chart(portfolio_data):
 
     st.plotly_chart(fig_amount, use_container_width=True)
 
+    # 显示各资产类别对总资产增值的贡献
+    st.markdown("### 📈 各资产类别增值贡献")
+
+    first_row = portfolio_data.iloc[0]
+    last_row = portfolio_data.iloc[-1]
+
+    # 计算总资产增值
+    total_first_value = first_row['总资产']
+    total_last_value = last_row['总资产']
+    total_gain = total_last_value - total_first_value
+    total_gain_pct = (total_gain / total_first_value * 100) if total_first_value > 0 else 0
+
+    # 显示总增值
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric(
+            label="💰 总资产增值",
+            value=f"¥{total_gain:,.2f}",
+            delta=f"{total_gain_pct:+.2f}%"
+        )
+    with col2:
+        st.metric(
+            label="📊 总资产变化",
+            value=f"¥{total_first_value:,.2f} → ¥{total_last_value:,.2f}"
+        )
+
+    # 计算并显示每个资产类别的贡献
+    st.markdown("#### 各类别贡献分析")
+
+    contribution_data = []
+    for asset_type in ['股票', '黄金', '现金', '国债']:
+        first_value = first_row[asset_type]
+        last_value = last_row[asset_type]
+        gain = last_value - first_value
+        gain_pct = (gain / total_first_value * 100) if total_first_value > 0 else 0
+        contribution_to_total_gain = (gain / total_gain * 100) if total_gain != 0 else 0
+
+        contribution_data.append({
+            '资产类别': asset_type,
+            '初值': first_value,
+            '末值': last_value,
+            '增值': gain,
+            '增值率': gain_pct,
+            '对总增值贡献': contribution_to_total_gain
+        })
+
+    # 创建贡献度DataFrame并显示
+    import pandas as pd
+    contrib_df = pd.DataFrame(contribution_data)
+
+    # 显示为表格
+    st.dataframe(
+        contrib_df.style.format({
+            '初值': '¥{:,.2f}',
+            '末值': '¥{:,.2f}',
+            '增值': '¥{:,.2f}',
+            '增值率': '{:.2f}%',
+            '对总增值贡献': '{:.2f}%'
+        }),
+        use_container_width=True,
+        hide_index=True
+    )
+
+    # 可视化贡献度（横向条形图）
+    fig_contrib = go.Figure(data=[go.Bar(
+        x=contrib_df['对总增值贡献'],
+        y=contrib_df['资产类别'],
+        orientation='h',
+        text=[f"{x:.2f}%" for x in contrib_df['对总增值贡献']],
+        textposition='outside',
+        marker=dict(
+            color=['#FF6B6B', '#FFA500', '#4ECDC4', '#95E1D3'],
+            line=dict(color='white', width=2)
+        ),
+        hovertemplate='%{y}<br>贡献: %{x:.2f}%<extra></extra>'
+    )])
+
+    fig_contrib.update_layout(
+        title="各资产类别对总资产增值的贡献率",
+        xaxis_title="贡献率 (%)",
+        yaxis_title="资产类别",
+        template='plotly_white',
+        height=300,
+        margin=dict(l=20, r=150, t=40, b=40)
+    )
+
+    st.plotly_chart(fig_contrib, use_container_width=True)
+
+    # 详细说明
+    with st.expander("💡 如何理解贡献度？"):
+        st.markdown("""
+        **贡献度计算公式**：
+        ```
+        某资产类别贡献率 = (该资产类别增值 ÷ 总资产增值) × 100%
+
+        其中：
+        - 该资产类别增值 = 末值 - 初值
+        - 总资产增值 = 所有资产增值的总和
+        ```
+
+        **解读示例**：
+        - 如果股票贡献率是 60%，说明总资产增值中有 60% 来自股票的增值
+        - 贡献率越高，该资产类别对整体收益的影响越大
+        - 贡献率可能为负（该资产贬值），会拖累整体收益
+        """)
+
+    st.markdown("---")
+
 
 def render_asset_performance(historical_data):
     """渲染各标的收益表现（归一化）"""
