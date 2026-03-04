@@ -800,9 +800,14 @@ def main():
     # 初始化日期范围选择（只在第一次运行时）
     if 'selected_date_range' not in st.session_state:
         st.session_state.selected_date_range = "最近365天"
-        logger.info("初始化selected_date_range为最近365天")
+        logger.info("✅ 初始化selected_date_range为最近365天")
     else:
-        logger.info(f"从session_state恢复selected_date_range: {st.session_state.selected_date_range}")
+        logger.info(f"✅ 从session_state恢复selected_date_range: {st.session_state.selected_date_range}")
+
+    if 'custom_start_date' in st.session_state:
+        logger.info(f"✅ custom_start_date存在: {st.session_state.custom_start_date}")
+    else:
+        logger.info("❌ custom_start_date不存在")
 
     # 侧边栏页面导航
     with st.sidebar:
