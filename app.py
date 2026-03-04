@@ -63,6 +63,48 @@ def load_data(date_range="最近90天"):
     return historical_data, portfolio_data
 
 
+def calculate_change_percentages(portfolio_data, asset_name='总资产'):
+    """计算不同时间段的涨跌幅"""
+    if portfolio_data is None or portfolio_data.empty or len(portfolio_data) < 2:
+        return None
+
+    latest = portfolio_data[asset_name].iloc[-1]
+
+    result = {
+        'latest': latest,
+        'daily_change': None,
+        'weekly_change': None,
+        'monthly_change': None,
+        'total_change': None
+    }
+
+    # 日涨幅（相比前一天）
+    if len(portfolio_data) >= 2:
+        previous = portfolio_data[asset_name].iloc[-2]
+        if previous > 0:
+            result['daily_change'] = ((latest - previous) / previous * 100)
+
+    # 周涨幅（相比7天前）
+    if len(portfolio_data) >= 7:
+        week_ago = portfolio_data[asset_name].iloc[-7]
+        if week_ago > 0:
+            result['weekly_change'] = ((latest - week_ago) / week_ago * 100)
+
+    # 月涨幅（相比30天前）
+    if len(portfolio_data) >= 30:
+        month_ago = portfolio_data[asset_name].iloc[-30]
+        if month_ago > 0:
+            result['monthly_change'] = ((latest - month_ago) / month_ago * 100)
+
+    # 总涨幅（相比第一天）
+    if len(portfolio_data) >= 2:
+        first = portfolio_data[asset_name].iloc[0]
+        if first > 0:
+            result['total_change'] = ((latest - first) / first * 100)
+
+    return result
+
+
 def render_total_assets_chart(portfolio_data):
     """渲染总资产走势图"""
     if portfolio_data is None or portfolio_data.empty:
@@ -390,6 +432,9 @@ def render_config_manager():
                     if valid_assets:
                         st.session_state.assets = valid_assets
                         save_to_session('investment_assets', valid_assets)
+                        # 清除缓存并跳转到首页
+                        st.cache_data.clear()
+                        st.session_state.current_page = 'dashboard'
                         st.success(f"✅ 成功导入 {len(valid_assets)} 个资产配置")
                         st.rerun()
                     else:
@@ -414,6 +459,9 @@ def render_config_manager():
                 st.session_state.assets = default_assets
                 save_to_session('investment_assets', default_assets)
                 st.session_state.confirm_reset = False
+                # 清除缓存并跳转到首页
+                st.cache_data.clear()
+                st.session_state.current_page = 'dashboard'
                 st.success("✅ 已切换到默认配置（4个资产）")
                 st.rerun()
 
@@ -656,6 +704,9 @@ def render_config_manager():
                     save_to_session('investment_assets', assets)
                     st.session_state.show_add_form = False
                     st.session_state.editing_index = None
+                    # 清除缓存并跳转到首页
+                    st.cache_data.clear()
+                    st.session_state.current_page = 'dashboard'
                     st.rerun()
 
             if cancel:
@@ -671,6 +722,9 @@ def render_config_manager():
                 save_to_session('investment_assets', assets)
                 st.session_state.show_add_form = False
                 st.session_state.editing_index = None
+                # 清除缓存并跳转到首页
+                st.cache_data.clear()
+                st.session_state.current_page = 'dashboard'
                 st.success(f"✅ 已删除资产：{deleted_name}")
                 st.rerun()
 
@@ -838,48 +892,86 @@ def main():
     if st.session_state.show_numbers:
         latest = portfolio_data.iloc[-1]
 
-        col1, col2, col3, col4, col5 = st.columns(5)
+        # 计算总资产的涨幅
+        total_stats = calculate_change_percentages(portfolio_data, '总资产')
 
-        with col1:
-            # 显示最后一天相比前一天的变化
-            if len(portfolio_data) >= 2:
-                previous_value = portfolio_data['总资产'].iloc[-2]
-                daily_change = ((latest['总资产'] - previous_value) / previous_value * 100)
-                st.metric("总资产", f"¥{latest['总资产']:,.2f}", f"{daily_change:+.2f}%")
-            else:
-                st.metric("总资产", f"¥{latest['总资产']:,.2f}")
+        # 第一行：总资产信息
+        st.markdown("### 💰 总资产概览")
+        col_total1, col_total2, col_total3, col_total4 = st.columns(4)
 
-        with col2:
-            if len(portfolio_data) >= 2:
-                previous_stock = portfolio_data['股票'].iloc[-2]
-                stock_change = ((latest['股票'] - previous_stock) / previous_stock * 100) if previous_stock > 0 else 0
-                st.metric("股票占比", f"{latest['股票占比']:.2f}%", f"{stock_change:+.2f}%")
-            else:
-                st.metric("股票占比", f"{latest['股票占比']:.2f}%", f"¥{latest['股票']:,.2f}")
+        with col_total1:
+            st.metric(
+                "当前总金额",
+                f"¥{latest['总资产']:,.2f}",
+                delta=f"{total_stats['daily_change']:+.2f}%" if total_stats['daily_change'] is not None else None,
+                help="相比前一天的涨跌幅"
+            )
 
-        with col3:
-            if len(portfolio_data) >= 2:
-                previous_gold = portfolio_data['黄金'].iloc[-2]
-                gold_change = ((latest['黄金'] - previous_gold) / previous_gold * 100) if previous_gold > 0 else 0
-                st.metric("黄金占比", f"{latest['黄金占比']:.2f}%", f"{gold_change:+.2f}%")
+        with col_total2:
+            if total_stats['weekly_change'] is not None:
+                st.metric("近一周", f"{total_stats['weekly_change']:+.2f}%", help="相比7天前的涨跌幅")
             else:
-                st.metric("黄金占比", f"{latest['黄金占比']:.2f}%", f"¥{latest['黄金']:,.2f}")
+                st.metric("近一周", "暂无数据")
 
-        with col4:
-            if len(portfolio_data) >= 2:
-                previous_cash = portfolio_data['现金'].iloc[-2]
-                cash_change = ((latest['现金'] - previous_cash) / previous_cash * 100) if previous_cash > 0 else 0
-                st.metric("现金占比", f"{latest['现金占比']:.2f}%", f"{cash_change:+.2f}%")
+        with col_total3:
+            if total_stats['monthly_change'] is not None:
+                st.metric("近一月", f"{total_stats['monthly_change']:+.2f}%", help="相比30天前的涨跌幅")
             else:
-                st.metric("现金占比", f"{latest['现金占比']:.2f}%", f"¥{latest['现金']:,.2f}")
+                st.metric("近一月", "暂无数据")
 
-        with col5:
-            if len(portfolio_data) >= 2:
-                previous_bond = portfolio_data['国债'].iloc[-2]
-                bond_change = ((latest['国债'] - previous_bond) / previous_bond * 100) if previous_bond > 0 else 0
-                st.metric("国债占比", f"{latest['国债占比']:.2f}%", f"{bond_change:+.2f}%")
+        with col_total4:
+            if total_stats['total_change'] is not None:
+                st.metric("累计涨幅", f"{total_stats['total_change']:+.2f}%", help="相比第一天的累计涨跌幅")
             else:
-                st.metric("国债占比", f"{latest['国债占比']:.2f}%", f"¥{latest['国债']:,.2f}")
+                st.metric("累计涨幅", "暂无数据")
+
+        st.markdown("---")
+
+        # 第二行：各资产类型详情
+        st.markdown("### 📊 资产类型详情")
+
+        asset_types = [
+            {'name': '股票', 'icon': '📈', 'color': '#1f77b4'},
+            {'name': '黄金', 'icon': '🏅', 'color': '#ff7f0e'},
+            {'name': '现金', 'icon': '💵', 'color': '#2ca02c'},
+            {'name': '国债', 'icon': '📜', 'color': '#d62728'}
+        ]
+
+        cols = st.columns(4)
+        for idx, asset_info in enumerate(asset_types):
+            asset_name = asset_info['name']
+            with cols[idx]:
+                # 计算该资产类型的涨幅
+                asset_stats = calculate_change_percentages(portfolio_data, asset_name)
+
+                # 显示金额和占比
+                amount = latest[asset_name]
+                percentage = latest[f'{asset_name}占比']
+
+                st.markdown(f"#### {asset_info['icon']} {asset_name}")
+
+                # 金额
+                st.metric(
+                    "总金额",
+                    f"¥{amount:,.2f}",
+                    delta=f"{asset_stats['daily_change']:+.2f}%" if asset_stats and asset_stats['daily_change'] is not None else None
+                )
+
+                # 占比
+                st.metric(
+                    "占比",
+                    f"{percentage:.2f}%"
+                )
+
+                # 涨幅详情（使用expander折叠）
+                if asset_stats:
+                    with st.expander("📊 涨幅详情", expanded=False):
+                        if asset_stats['weekly_change'] is not None:
+                            st.write(f"📅 近一周: **{asset_stats['weekly_change']:+.2f}%**")
+                        if asset_stats['monthly_change'] is not None:
+                            st.write(f"📅 近一月: **{asset_stats['monthly_change']:+.2f}%**")
+                        if asset_stats['total_change'] is not None:
+                            st.write(f"📅 累计: **{asset_stats['total_change']:+.2f}%**")
 
         st.markdown("---")
     else:
