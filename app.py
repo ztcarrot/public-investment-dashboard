@@ -779,6 +779,13 @@ def load_assets_config():
 def main():
     """主函数"""
 
+    # 调试信息：显示所有session_state
+    if st.checkbox("显示所有session_state", key="debug_session"):
+        st.write("Session State Keys:", list(st.session_state.keys()))
+        for key, value in st.session_state.items():
+            if not key.startswith('_'):  # 不显示内部变量
+                st.write(f"{key}: {value}")
+
     # 初始化session state
     if 'assets' not in st.session_state:
         st.session_state.assets = load_assets_config()
@@ -793,6 +800,9 @@ def main():
     # 初始化日期范围选择（只在第一次运行时）
     if 'selected_date_range' not in st.session_state:
         st.session_state.selected_date_range = "最近365天"
+        logger.info("初始化selected_date_range为最近365天")
+    else:
+        logger.info(f"从session_state恢复selected_date_range: {st.session_state.selected_date_range}")
 
     # 侧边栏页面导航
     with st.sidebar:
