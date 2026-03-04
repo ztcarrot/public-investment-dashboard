@@ -44,7 +44,7 @@ def load_data(date_range="最近90天", custom_days=None):
         "最近365天": 365
     }
 
-    if date_range == "自定义" and custom_days is not None:
+    if date_range == "自定义日期" and custom_days is not None:
         days = custom_days
     else:
         days = days_map.get(date_range, 90)
