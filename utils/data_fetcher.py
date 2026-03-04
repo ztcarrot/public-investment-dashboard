@@ -407,6 +407,13 @@ class DataFetcher:
             df['日期'] = df['日期'].dt.strftime('%Y-%m-%d')
             logger.info(f"短债基金 {code} 日期已增加一天")
 
+        # 特殊处理：基金类型数据前向填充
+        # 如果某天数据缺失，使用上一个有数值的天的数据
+        if code_type == '基金':
+            df = df.sort_values('日期')
+            df['净值'] = df['净值'].fillna(method='ffill')
+            logger.info(f"基金 {code} 已执行前向填充，补充缺失数据")
+
         # 计算市值（使用份额）
         df['持有份额'] = shares
         df['当前市值'] = df['净值'] * shares
