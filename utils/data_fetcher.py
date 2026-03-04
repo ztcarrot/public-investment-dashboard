@@ -337,7 +337,18 @@ class DataFetcher:
         code_type = asset.get('代码类型', '基金')
         name = asset.get('名称')
         asset_type = asset.get('资产类别', '股票')
-        shares = float(asset.get('初始份额', 0))
+        shares_value = asset.get('初始份额')
+        amount_value = asset.get('初始金额')
+
+        # 处理份额和金额：至少有一个不为None
+        if shares_value is not None and shares_value > 0:
+            shares = float(shares_value)
+        elif amount_value is not None and amount_value > 0:
+            # 如果提供的是金额，暂时设置为0，后续会根据价格计算
+            shares = 0.0
+        else:
+            # 都没有提供，默认为0
+            shares = 0.0
 
         # 获取历史数据
         # 特殊处理19789（25特国06）
