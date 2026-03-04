@@ -13,7 +13,7 @@ import logging
 
 from utils.data_fetcher import DataFetcher
 from utils.config_manager import get_default_assets, parse_secrets_assets, validate_asset, calculate_shares_or_amount
-from utils.local_storage import save_to_localstorage, load_from_localstorage
+from utils.local_storage import save_to_session, load_from_session
 import json
 
 # 配置日志
@@ -392,7 +392,7 @@ def render_config_manager():
                             valid_assets.append(asset)
                     if valid_assets:
                         st.session_state.assets = valid_assets
-                        save_to_localstorage('investment_assets', valid_assets)
+                        save_to_session('investment_assets', valid_assets)
                         st.success(f"✅ 成功导入 {len(valid_assets)} 个资产配置")
                         st.rerun()
                     else:
@@ -407,7 +407,7 @@ def render_config_manager():
             if st.confirm("⚠️ 确定要恢复默认配置吗？当前配置将被覆盖"):
                 default_assets = get_default_assets()
                 st.session_state.assets = default_assets
-                save_to_localstorage('investment_assets', default_assets)
+                save_to_session('investment_assets', default_assets)
                 st.success("✅ 已恢复默认配置")
                 st.rerun()
 
@@ -509,7 +509,7 @@ def render_config_manager():
                 # 保存到session_state
                 st.session_state.assets = valid_assets
                 # 保存到LocalStorage
-                save_to_localstorage('investment_assets', valid_assets)
+                save_to_session('investment_assets', valid_assets)
                 st.success(f"✅ 成功保存 {len(valid_assets)} 个资产配置")
                 st.info("💡 配置已保存，请返回数据看板查看效果")
 
@@ -525,11 +525,11 @@ def render_config_manager():
 
 def load_assets_config():
     """加载资产配置 - 按优先级"""
-    # 1. 尝试从 LocalStorage 加载
-    local_config = load_from_localstorage('investment_assets')
-    if local_config and len(local_config) > 0:
-        logger.info("从 LocalStorage 加载配置")
-        return local_config
+    # 1. 尝试从 session_state 加载（用户修改后的配置）
+    session_config = load_from_session('investment_assets')
+    if session_config and len(session_config) > 0:
+        logger.info("从 session_state 加载配置")
+        return session_config
 
     # 2. 尝试从 secrets 加载
     if hasattr(st, 'secrets') and 'assets' in st.secrets:
