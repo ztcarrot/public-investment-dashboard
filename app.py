@@ -879,11 +879,6 @@ def main():
         # 如果选择自定义，显示日期选择器
         custom_days = None
         if date_range == "自定义日期":
-            # 初始化自定义日期
-            if 'custom_start_date' not in st.session_state:
-                default_date_dt = datetime.now() - timedelta(days=365)
-                st.session_state.custom_start_date = default_date_dt.date()
-
             # 确保是date类型
             saved_date = st.session_state.custom_start_date
             if isinstance(saved_date, datetime):
