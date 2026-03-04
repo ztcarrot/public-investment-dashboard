@@ -642,9 +642,44 @@ def render_config_manager():
     # 显示资产列表
     for idx, asset in enumerate(assets):
         shares = asset.get('初始份额', 0)
+        code = asset.get('代码')
+        code_type = asset.get('代码类型')
+
+        # 获取当前价格和金额
+        current_amount = None
+        if shares and shares > 0 and code:
+            try:
+                # 从缓存或实时获取当前价格
+                if 'current_price_cache' not in st.session_state:
+                    st.session_state.current_price_cache = {}
+
+                cache_key = f"{code}_{code_type}"
+                if cache_key in st.session_state.current_price_cache:
+                    current_price = st.session_state.current_price_cache[cache_key]
+                    current_amount = current_price * shares
+                else:
+                    # 实时获取价格
+                    fetcher = DataFetcher()
+                    end = datetime.now().strftime('%Y-%m-%d')
+                    start = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+
+                    temp_asset = {
+                        '代码': code,
+                        '代码类型': code_type,
+                        '初始份额': 1.0
+                    }
+                    history = fetcher.fetch_asset_data(temp_asset, start, end)
+                    if not history.empty and '净值' in history.columns:
+                        current_price = history['净值'].iloc[-1]
+                        st.session_state.current_price_cache[cache_key] = current_price
+                        current_amount = current_price * shares
+            except Exception as e:
+                logger.debug(f"获取 {code} 当前价格失败: {e}")
 
         # 构建显示信息
         holding_display = f"{shares:,.2f} 份" if shares and shares > 0 else "未配置"
+        if current_amount:
+            holding_display += f" ≈ ¥{current_amount:,.2f}"
 
         with st.expander(f"{idx + 1}. {asset['名称']} ({asset['代码']}) - {holding_display}", expanded=False):
             col_info1, col_info2, col_info3 = st.columns([2, 2, 1])
@@ -662,7 +697,9 @@ def render_config_manager():
                 if shares and shares > 0:
                     st.metric("持有份额", f"{shares:,.2f}")
 
-                st.markdown("<br>", unsafe_allow_html=True)  # 添加间距
+                # 显示当前金额
+                if current_amount:
+                    st.metric("当前金额", f"¥{current_amount:,.2f}")
 
                 if st.button(f"✏️ 编辑", key=f"edit_{idx}", use_container_width=True):
                     st.session_state.show_add_form = True
