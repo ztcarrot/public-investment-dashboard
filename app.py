@@ -676,10 +676,10 @@ def render_config_manager():
                     current_price = st.session_state.current_price_cache[cache_key]
                     current_amount = current_price * shares
                 else:
-                    # 实时获取价格
+                    # 实时获取价格 - 使用更大的日期范围
                     fetcher = DataFetcher()
                     end = datetime.now().strftime('%Y-%m-%d')
-                    start = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+                    start = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
 
                     temp_asset = {
                         '代码': code,
@@ -688,14 +688,61 @@ def render_config_manager():
                         '资产类别': asset.get('资产类别', '股票'),
                         '初始份额': 1.0
                     }
+
+                    # 尝试获取数据
                     history = fetcher.fetch_asset_data(temp_asset, start, end)
+
                     if not history.empty and '净值' in history.columns:
                         current_price = float(history['净值'].iloc[-1])
                         current_amount = current_price * shares
                         st.session_state.current_price_cache[cache_key] = current_price
                         logger.info(f"✅ {code} 价格: {current_price:.4f}, 金额: {current_amount:.2f}")
                     else:
-                        logger.warning(f"❌ {code} 获取失败: history为空")
+                        logger.warning(f"❌ {code} API返回空数据，尝试备用方法")
+
+                        # 备用方法：直接使用东方财富API获取最新价格
+                        try:
+                            import requests
+                            # 构建东方财富API URL
+                            if code_type == '场内ETF':
+                                if code.startswith('5') or code.startswith('6') or code.startswith('11'):
+                                    secid = f"1.{code}"
+                                else:
+                                    secid = f"0.{code}"
+                                url = f"http://push2.eastmoney.com/api/qt/stock/kline/get?secid={secid}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=101&fqt=0&beg=20200101&end={end.replace('-', '')}"
+                            elif code_type == '基金':
+                                url = f"http://fund.eastmoney.com/pingzhongdata/{code.zfill(6)}.js"
+                            else:
+                                logger.warning(f"❌ {code} 不支持的代码类型: {code_type}")
+                                current_price = None
+
+                            if url:
+                                response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
+                                if response.status_code == 200:
+                                    if code_type == '场内ETF':
+                                        import json
+                                        data = response.json()
+                                        if data.get('data') and data['data'].get('klines'):
+                                            kline = data['data']['klines'][0]
+                                            price = float(kline.split(',')[2])
+                                            current_price = price
+                                            current_amount = current_price * shares
+                                            st.session_state.current_price_cache[cache_key] = current_price
+                                            logger.info(f"✅ {code} 备用方法成功: {current_price:.4f}")
+                                    elif code_type == '基金':
+                                        import re
+                                        match = re.search(r'Data_netWorthTrend.*?\[\[(.*?)\]\]', response.text)
+                                        if match:
+                                            data_str = match.group(1).split('],[')[0]
+                                            price = float(data_str.split(',')[1].replace('"', '').strip())
+                                            current_price = price
+                                            current_amount = current_price * shares
+                                            st.session_state.current_price_cache[cache_key] = current_price
+                                            logger.info(f"✅ {code} 基金备用方法成功: {current_price:.4f}")
+                                else:
+                                    logger.warning(f"❌ {code} 备用API失败: HTTP {response.status_code}")
+                        except Exception as e2:
+                            logger.error(f"❌ {code} 备用方法异常: {e2}")
             except Exception as e:
                 logger.error(f"❌ {code} 异常: {e}")
                 import traceback
