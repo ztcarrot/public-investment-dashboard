@@ -678,25 +678,20 @@ def render_config_manager():
     st.caption(f"📊 当前配置：共 {len(assets)} 个资产")
     st.caption("💡 提示：点击资产左侧的 ▶ 展开详情，点击「编辑」按钮修改配置")
 
-    # 操作按钮区域
+    # 添加资产按钮（列表下方）
+    if st.button("➕ 添加资产", type="primary", use_container_width=True):
+        st.session_state.show_add_form = True
+        st.session_state.editing_index = None
+        st.rerun()
+
     st.markdown("---")
     st.subheader("🛠️ 配置操作")
 
-    # 第一行按钮
-    col1, col2 = st.columns(2)
-
-    with col1:
-        if st.button("➕ 添加资产", type="primary", use_container_width=True):
-            st.session_state.show_add_form = True
-            st.session_state.editing_index = None
-            st.session_state.scroll_to_form = True
-            st.rerun()
-
-    with col2:
-        if st.button("🏠 返回首页", use_container_width=True):
-            st.session_state.current_page = 'dashboard'
-            st.session_state.page_selection = 0
-            st.rerun()
+    # 第一行：返回首页
+    if st.button("🏠 返回首页", use_container_width=True):
+        st.session_state.current_page = 'dashboard'
+        st.session_state.page_selection = 0
+        st.rerun()
 
     # 第二行按钮
     col3, col4, col5 = st.columns(3)
