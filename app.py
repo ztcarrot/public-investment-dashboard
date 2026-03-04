@@ -474,6 +474,28 @@ def render_config_manager():
                     help="选择输入方式，另一个会自动计算"
                 )
 
+                # 获取当前价格（用于金额模式下计算份额）
+                current_price = None
+                if code and len(code) == 6:
+                    with st.spinner(f"正在获取 {code} 的当前价格..."):
+                        try:
+                            fetcher = DataFetcher()
+                            # 获取最近一天的数据
+                            from datetime import datetime, timedelta
+                            end = datetime.now().strftime('%Y-%m-%d')
+                            start = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+
+                            temp_asset = {
+                                '代码': code,
+                                '代码类型': code_type,
+                                '初始份额': 1.0  # 临时值，用于获取价格
+                            }
+                            history = fetcher.fetch_asset_data(temp_asset, start, end)
+                            if not history.empty and '净值' in history.columns:
+                                current_price = history['净值'].iloc[-1]
+                        except Exception as e:
+                            st.warning(f"⚠️ 无法获取价格: {str(e)}")
+
                 if input_mode == "按份额":
                     shares = st.number_input(
                         "初始份额 *",
@@ -483,6 +505,12 @@ def render_config_manager():
                         format="%.2f",
                         help="输入持有份额"
                     )
+
+                    # 显示当前价值预估
+                    if current_price and shares > 0:
+                        estimated_value = current_price * shares
+                        st.info(f"💰 当前价格: ¥{current_price:.4f} → 预估市值: ¥{estimated_value:,.2f}")
+
                     amount = None
                 else:
                     amount = st.number_input(
@@ -493,7 +521,14 @@ def render_config_manager():
                         format="%.2f",
                         help="输入初始金额，系统会根据当前价格自动计算份额"
                     )
-                    shares = None
+
+                    # 自动计算份额并显示
+                    if current_price and amount and amount > 0:
+                        calculated_shares = amount / current_price
+                        st.info(f"💰 当前价格: ¥{current_price:.4f} → 自动计算份额: {calculated_shares:,.2f} 份")
+                        shares = calculated_shares
+                    else:
+                        shares = None
 
             col_submit1, col_submit2, col_submit3 = st.columns(3)
 
@@ -567,7 +602,19 @@ def render_config_manager():
 
     # 显示资产列表
     for idx, asset in enumerate(assets):
-        with st.expander(f"{idx + 1}. {asset['名称']} ({asset['代码']})", expanded=False):
+        shares = asset.get('初始份额', 0)
+        amount = asset.get('初始金额', 0)
+
+        # 构建显示信息
+        holding_info = []
+        if shares and shares > 0:
+            holding_info.append(f"{shares:,.2f} 份")
+        if amount and amount > 0:
+            holding_info.append(f"¥{amount:,.2f}")
+
+        holding_display = " | ".join(holding_info) if holding_info else "未配置"
+
+        with st.expander(f"{idx + 1}. {asset['名称']} ({asset['代码']}) - {holding_display}", expanded=False):
             col_info1, col_info2, col_info3 = st.columns([2, 2, 1])
 
             with col_info1:
@@ -579,6 +626,14 @@ def render_config_manager():
                 st.write(f"**资产类别**: {asset['资产类别']}")
 
             with col_info3:
+                # 显示持有信息
+                if shares and shares > 0:
+                    st.metric("初始份额", f"{shares:,.2f}")
+                if amount and amount > 0:
+                    st.metric("初始金额", f"¥{amount:,.2f}")
+
+                st.markdown("<br>", unsafe_allow_html=True)  # 添加间距
+
                 if st.button(f"✏️ 编辑", key=f"edit_{idx}", use_container_width=True):
                     st.session_state.show_add_form = True
                     st.session_state.editing_index = idx
