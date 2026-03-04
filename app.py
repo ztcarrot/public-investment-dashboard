@@ -694,8 +694,32 @@ def load_assets_config():
         logger.info("从 session_state 加载配置")
         return session_config
 
-    # 2. 默认使用默认配置（4个资产）
-    # 注意：secrets.toml 的配置可以通过"导入配置"功能手动导入
+    # 2. 尝试从 secrets.toml 加载
+    try:
+        if hasattr(st, 'secrets') and 'assets' in st.secrets:
+            secrets_assets = st.secrets['assets']
+            logger.info(f"从 secrets.toml 加载配置: {len(secrets_assets) if isinstance(secrets_assets, list) else 1} 个资产")
+
+            # 解析并验证 secrets 配置
+            parsed_assets = []
+            for asset in secrets_assets:
+                is_valid, error_msg = validate_asset(asset)
+                if is_valid:
+                    parsed_assets.append(asset)
+                else:
+                    logger.warning(f"secrets 中的资产配置无效: {error_msg}")
+
+            if parsed_assets:
+                logger.info(f"成功从 secrets.toml 加载 {len(parsed_assets)} 个有效资产配置")
+                return parsed_assets
+            else:
+                logger.warning("secrets.toml 中的资产配置全部无效，使用默认配置")
+        else:
+            logger.info("secrets.toml 中未找到 assets 配置")
+    except Exception as e:
+        logger.error(f"从 secrets.toml 加载配置失败: {str(e)}")
+
+    # 3. 默认使用默认配置（4个资产）
     logger.info("使用默认配置")
     return get_default_assets()
 
