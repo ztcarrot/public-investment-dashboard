@@ -389,6 +389,47 @@ def render_config_manager():
         st.rerun()
 
     st.title("⚙️ 配置管理")
+
+    # 使用说明
+    with st.expander("💡 使用说明", expanded=False):
+        st.markdown("""
+        ### 配置存储方式
+
+        您的配置（日期和资产）**保存在网址（URL）中**，具有以下特点：
+
+        - ✅ **完全独立**：每个用户有独立的配置，互不干扰
+        - ✅ **自动保存**：修改配置后自动更新网址
+        - ✅ **刷新不丢失**：配置保存在网址中，刷新页面配置不变
+        - ✅ **可分享**：可以将配置网址分享给其他人
+        - ✅ **书签保存**：可以将当前网址保存为浏览器书签，下次直接打开
+
+        ### 如何保存配置？
+
+        点击下方 **📤 复制配置链接** 按钮，将配置网址保存到粘贴板，然后：
+        - 保存为浏览器书签
+        - 发送给其他人
+        - 记录在笔记中
+        """)
+
+        # 分享按钮
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            # 使用 JavaScript 复制当前 URL 到粘贴板
+            copy_button = st.button("📤 复制配置链接", type="primary", use_container_width=True)
+            if copy_button:
+                js_code = """
+                <script>
+                const currentUrl = window.location.href;
+                navigator.clipboard.writeText(currentUrl).then(() => {
+                    alert('✅ 配置链接已复制到粘贴板！');
+                }).catch(err => {
+                    console.error('复制失败:', err);
+                    alert('❌ 复制失败，请手动复制网址');
+                });
+                </script>
+                """
+                st.components.v1.html(js_code, height=0)
+
     st.markdown("---")
 
     # 添加/编辑资产表单（弹窗形式）
