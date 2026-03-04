@@ -383,14 +383,31 @@ class DataFetcher:
             df['日期'] = df['日期'].dt.strftime('%Y-%m-%d')
             logger.info(f"短债基金 {code} 日期已增加一天")
 
-        # 计算市值
+        # 计算份额和市值
+        # 如果用户输入的是金额，需要根据最新价格计算份额
+        latest_price = df['净值'].iloc[-1] if len(df) > 0 else 0
+
+        if amount_value is not None and amount_value > 0:
+            # 用户输入的是金额，计算份额
+            if latest_price > 0:
+                calculated_shares = amount_value / latest_price
+                df['持有份额'] = calculated_shares
+                df['当前市值'] = df['净值'] * calculated_shares
+            else:
+                # 价格无效，使用金额作为市值
+                df['持有份额'] = 0.0
+                df['当前市值'] = amount_value
+        else:
+            # 用户输入的是份额
+            df['持有份额'] = shares
+            df['当前市值'] = df['净值'] * shares
+
+        # 添加其他信息
         df['代码'] = code
         df['名称'] = name
         df['代码类型'] = code_type
         df['资产类型'] = asset_type
         df['最新价格'] = df['净值']
-        df['持有份额'] = shares
-        df['当前市值'] = df['净值'] * shares
 
         # 计算收益率
         if len(df) > 0:
