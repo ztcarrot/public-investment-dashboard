@@ -4,7 +4,7 @@
 用于管理投资组合的资产配置，包括默认配置、配置验证和计算功能。
 """
 
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Tuple
 
 
 def get_default_assets() -> List[Dict[str, Union[str, float, None]]]:
@@ -91,7 +91,7 @@ def parse_secrets_assets(assets_data: List[Dict]) -> List[Dict[str, Union[str, f
     return parsed_assets
 
 
-def validate_asset(asset: Dict) -> tuple[bool, str]:
+def validate_asset(asset: Dict) -> Tuple[bool, str]:
     """
     验证单个资产配置的有效性。
 
