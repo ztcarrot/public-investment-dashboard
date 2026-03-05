@@ -48,6 +48,51 @@ st.markdown("""
 [data-testid="stMetricValue"] {
     text-align: left;
 }
+
+/* 帮助图标 tooltip 样式 */
+.help-tooltip-container {
+    position: relative;
+    display: inline-block;
+    margin-top: 8px;
+}
+
+.help-icon {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    line-height: 20px;
+    text-align: center;
+    border-radius: 50%;
+    background-color: #6c757d;
+    color: white;
+    font-weight: bold;
+    font-size: 14px;
+    cursor: help;
+}
+
+.help-tooltip-content {
+    display: none;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 100%;
+    margin-bottom: 8px;
+    min-width: 300px;
+    max-width: 400px;
+    padding: 12px;
+    background-color: #343a40;
+    color: white;
+    border-radius: 6px;
+    font-size: 0.85em;
+    line-height: 1.4;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    z-index: 9999;
+    pointer-events: none;
+}
+
+.help-tooltip-container:hover .help-tooltip-content {
+    display: block !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1606,6 +1651,7 @@ def main():
             is_imbalanced = percentage < 15 or percentage > 35
 
             if is_imbalanced:
+                # 警告框
                 st.markdown(
                     f"""
                     <div style="background-color: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 12px; margin-top: 10px;">
@@ -1616,27 +1662,30 @@ def main():
                     """,
                     unsafe_allow_html=True
                 )
-                with st.expander("❓ 为何显示不平衡？", expanded=False):
-                    st.markdown("""
-                    **永久投资组合理想配置**
 
-                    四大核心资产各占 **25%**，实现风险分散和长期稳定增值：
-
-                    - 📈 **股票**：增长驱动
-                    - 🏅 **黄金**：保值避险
-                    - 💵 **现金**：流动性
-                    - 📜 **国债**：稳定收益
-
-                    **当前配置分析**
-
-                    - 📉 **低于 15%**：配置过低，可能影响整体收益
-                    - 📈 **高于 35%**：配置过高，增加集中风险
-                    - ✅ **15% - 35%**：合理范围内，适度偏离理想配置
-
-                    **建议**
-
-                    考虑调整至 **25% 左右**的平衡状态，实现真正的永久投资组合策略。
-                    """)
+                # 问号图标 + tooltip
+                st.markdown(
+                    f"""
+                    <div class="help-tooltip-container">
+                        <span class="help-icon">?</span>
+                        <div class="help-tooltip-content">
+                            <strong style="color: #ffc107;">永久投资组合理想配置</strong><br><br>
+                            四大核心资产各占 <strong style="color: #ffc107;">25%</strong>，实现风险分散和长期稳定增值：<br><br>
+                            📈 <strong>股票</strong>：增长驱动<br>
+                            🏅 <strong>黄金</strong>：保值避险<br>
+                            💵 <strong>现金</strong>：流动性<br>
+                            📜 <strong>国债</strong>：稳定收益<br><br>
+                            <strong style="color: #ffc107;">当前配置分析</strong><br><br>
+                            📉 <strong>低于 15%</strong>：配置过低，可能影响整体收益<br>
+                            📈 <strong>高于 35%</strong>：配置过高，增加集中风险<br>
+                            ✅ <strong>15% - 35%</strong>：合理范围内，适度偏离理想配置<br><br>
+                            <strong style="color: #ffc107;">建议</strong><br>
+                            考虑调整至 <strong>25% 左右</strong>的平衡状态，实现真正的永久投资组合策略。
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
             else:
                 st.metric(
                     "占比",
