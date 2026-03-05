@@ -1579,8 +1579,8 @@ def main():
     with st.expander("📊 各资产类型涨幅详情", expanded=False):
         st.caption("显示各资产类型在不同时间段内的涨跌幅")
 
-        # 使用4列显示
-        detail_cols = st.columns(4)
+        # 使用4列显示，增加列间距
+        detail_cols = st.columns(4, gap="large")
         for idx, asset_info in enumerate(asset_types):
             asset_name = asset_info['name']
             asset_stats = calculate_change_percentages(portfolio_data, asset_name)
