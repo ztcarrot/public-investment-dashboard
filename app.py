@@ -1501,16 +1501,24 @@ def main():
 
     with col_total2:
         if total_stats['weekly_change'] is not None:
-            amount_str = f"¥{total_stats['weekly_change_amount']:,.2f}" if total_stats['weekly_change_amount'] is not None else ""
-            delta_text = f"{total_stats['weekly_change']:+.2f}% ({amount_str})"
+            # 根据show_numbers决定是否显示金额
+            if st.session_state.show_numbers:
+                amount_str = f"¥{total_stats['weekly_change_amount']:,.2f}" if total_stats['weekly_change_amount'] is not None else ""
+                delta_text = f"{total_stats['weekly_change']:+.2f}% ({amount_str})"
+            else:
+                delta_text = f"{total_stats['weekly_change']:+.2f}%"
             st.metric("近一周", delta_text, help="相比7天前的涨跌幅")
         else:
             st.metric("近一周", "暂无数据")
 
     with col_total3:
         if total_stats['monthly_change'] is not None:
-            amount_str = f"¥{total_stats['monthly_change_amount']:,.2f}" if total_stats['monthly_change_amount'] is not None else ""
-            delta_text = f"{total_stats['monthly_change']:+.2f}% ({amount_str})"
+            # 根据show_numbers决定是否显示金额
+            if st.session_state.show_numbers:
+                amount_str = f"¥{total_stats['monthly_change_amount']:,.2f}" if total_stats['monthly_change_amount'] is not None else ""
+                delta_text = f"{total_stats['monthly_change']:+.2f}% ({amount_str})"
+            else:
+                delta_text = f"{total_stats['monthly_change']:+.2f}%"
             st.metric("近一月", delta_text, help="相比30天前的涨跌幅")
         else:
             st.metric("近一月", "暂无数据")
@@ -1581,18 +1589,36 @@ def main():
                 st.markdown(f"#### {asset_info['icon']} {asset_name}")
 
                 if asset_stats:
+                    # 根据show_numbers决定是否显示金额
+                    show_amount = st.session_state.show_numbers
+
                     if asset_stats['daily_change'] is not None:
-                        amount_str = f"¥{asset_stats['daily_change_amount']:,.2f}" if asset_stats.get('daily_change_amount') is not None else ""
-                        st.metric("日涨幅", f"{asset_stats['daily_change']:+.2f}% ({amount_str})")
+                        if show_amount and asset_stats.get('daily_change_amount') is not None:
+                            amount_str = f"¥{asset_stats['daily_change_amount']:,.2f}"
+                            st.metric("日涨幅", f"{asset_stats['daily_change']:+.2f}% ({amount_str})")
+                        else:
+                            st.metric("日涨幅", f"{asset_stats['daily_change']:+.2f}%")
+
                     if asset_stats['weekly_change'] is not None:
-                        amount_str = f"¥{asset_stats['weekly_change_amount']:,.2f}" if asset_stats.get('weekly_change_amount') is not None else ""
-                        st.metric("近一周", f"{asset_stats['weekly_change']:+.2f}% ({amount_str})")
+                        if show_amount and asset_stats.get('weekly_change_amount') is not None:
+                            amount_str = f"¥{asset_stats['weekly_change_amount']:,.2f}"
+                            st.metric("近一周", f"{asset_stats['weekly_change']:+.2f}% ({amount_str})")
+                        else:
+                            st.metric("近一周", f"{asset_stats['weekly_change']:+.2f}%")
+
                     if asset_stats['monthly_change'] is not None:
-                        amount_str = f"¥{asset_stats['monthly_change_amount']:,.2f}" if asset_stats.get('monthly_change_amount') is not None else ""
-                        st.metric("近一月", f"{asset_stats['monthly_change']:+.2f}% ({amount_str})")
+                        if show_amount and asset_stats.get('monthly_change_amount') is not None:
+                            amount_str = f"¥{asset_stats['monthly_change_amount']:,.2f}"
+                            st.metric("近一月", f"{asset_stats['monthly_change']:+.2f}% ({amount_str})")
+                        else:
+                            st.metric("近一月", f"{asset_stats['monthly_change']:+.2f}%")
+
                     if asset_stats['total_change'] is not None:
-                        amount_str = f"¥{asset_stats['total_change_amount']:,.2f}" if asset_stats.get('total_change_amount') is not None else ""
-                        st.metric("累计涨幅", f"{asset_stats['total_change']:+.2f}% ({amount_str})")
+                        if show_amount and asset_stats.get('total_change_amount') is not None:
+                            amount_str = f"¥{asset_stats['total_change_amount']:,.2f}"
+                            st.metric("累计涨幅", f"{asset_stats['total_change']:+.2f}% ({amount_str})")
+                        else:
+                            st.metric("累计涨幅", f"{asset_stats['total_change']:+.2f}%")
 
     st.markdown("---")
 
