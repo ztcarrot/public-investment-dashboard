@@ -44,9 +44,9 @@ st.markdown("""
     }
 }
 
-/* 确保metric组件中的数字右对齐 */
+/* 确保metric组件中的数字左对齐 */
 [data-testid="stMetricValue"] {
-    text-align: right;
+    text-align: left;
 }
 </style>
 """, unsafe_allow_html=True)
