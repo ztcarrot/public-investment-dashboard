@@ -1612,17 +1612,13 @@ def main():
                     <div style="background-color: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 12px; margin-top: 10px;">
                         <div style="font-size: 0.9em; font-weight: bold; color: #856404;">占比</div>
                         <div style="font-size: 1.5em; font-weight: bold; color: #d97706;">{percentage:.2f}%</div>
-                        <div style="font-size: 0.8em; color: #dc3545; font-weight: bold; margin-top: 4px;">⚠️ 不平衡</div>
+                        <div style="font-size: 0.8em; color: #dc3545; font-weight: bold; margin-top: 4px;">
+                            ⚠️ 不平衡
+                            <span style="margin-left: 8px; cursor: help; color: #6c757d; font-size: 16px; font-weight: bold;" title=&quot;永久投资组合理想配置：四大核心资产各占25%，实现风险分散和长期稳定增值。当前配置低于15%配置过低影响收益，高于35%增加集中风险。&quot;>❓</span>
+                        </div>
                     </div>
                     """,
                     unsafe_allow_html=True
-                )
-
-                # 帮助说明（使用带help的空metric）
-                st.metric(
-                    "",
-                    "",
-                    help="永久投资组合理想配置：四大核心资产各占25%，实现风险分散和长期稳定增值\n\n当前配置：低于15%配置过低影响收益，高于35%增加集中风险\n\n建议：调整至25%左右的平衡状态"
                 )
             else:
                 st.metric(
