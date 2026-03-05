@@ -1589,36 +1589,33 @@ def main():
                 st.markdown(f"#### {asset_info['icon']} {asset_name}")
 
                 if asset_stats:
-                    # 根据show_numbers决定是否显示金额
-                    show_amount = st.session_state.show_numbers
+                    # 涨跌幅详情折叠面板：始终只显示百分比，不显示金额
+                    # 红色代表涨，绿色代表跌
 
-                    if asset_stats['daily_change'] is not None:
-                        if show_amount and asset_stats.get('daily_change_amount') is not None:
-                            amount_str = f"¥{asset_stats['daily_change_amount']:,.2f}"
-                            st.metric("日涨幅", f"{asset_stats['daily_change']:+.2f}% ({amount_str})")
-                        else:
-                            st.metric("日涨幅", f"{asset_stats['daily_change']:+.2f}%")
+                    def format_change(value, label):
+                        """格式化涨跌幅显示，红色涨绿色跌"""
+                        if value is None:
+                            return None
 
-                    if asset_stats['weekly_change'] is not None:
-                        if show_amount and asset_stats.get('weekly_change_amount') is not None:
-                            amount_str = f"¥{asset_stats['weekly_change_amount']:,.2f}"
-                            st.metric("近一周", f"{asset_stats['weekly_change']:+.2f}% ({amount_str})")
-                        else:
-                            st.metric("近一周", f"{asset_stats['weekly_change']:+.2f}%")
+                        color = "#ff4b4b" if value > 0 else "#26c281"  # 红涨绿跌
+                        icon = "↑" if value > 0 else "↓" if value < 0 else "→"
 
-                    if asset_stats['monthly_change'] is not None:
-                        if show_amount and asset_stats.get('monthly_change_amount') is not None:
-                            amount_str = f"¥{asset_stats['monthly_change_amount']:,.2f}"
-                            st.metric("近一月", f"{asset_stats['monthly_change']:+.2f}% ({amount_str})")
-                        else:
-                            st.metric("近一月", f"{asset_stats['monthly_change']:+.2f}%")
+                        st.markdown(
+                            f"""
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin: 8px 0;">
+                                <span style="color: #666;">{label}</span>
+                                <span style="color: {color}; font-weight: bold; font-size: 1.1em;">
+                                    {icon} {abs(value):.2f}%
+                                </span>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
 
-                    if asset_stats['total_change'] is not None:
-                        if show_amount and asset_stats.get('total_change_amount') is not None:
-                            amount_str = f"¥{asset_stats['total_change_amount']:,.2f}"
-                            st.metric("累计涨幅", f"{asset_stats['total_change']:+.2f}% ({amount_str})")
-                        else:
-                            st.metric("累计涨幅", f"{asset_stats['total_change']:+.2f}%")
+                    format_change(asset_stats['daily_change'], "日涨幅")
+                    format_change(asset_stats['weekly_change'], "近一周")
+                    format_change(asset_stats['monthly_change'], "近一月")
+                    format_change(asset_stats['total_change'], "累计涨幅")
 
     st.markdown("---")
 
