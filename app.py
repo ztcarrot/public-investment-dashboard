@@ -1311,9 +1311,14 @@ def main():
     if 'current_page' not in st.session_state:
         st.session_state.current_page = 'dashboard'
 
-    # 初始化数字显示状态（默认隐藏）
+    # 初始化数字显示状态（从 URL 读取，默认隐藏）
     if 'show_numbers' not in st.session_state:
-        st.session_state.show_numbers = False
+        query_params = st.query_params
+        if 'show' in query_params:
+            # 从 URL 读取状态（"1" 表示显示，其他值表示隐藏）
+            st.session_state.show_numbers = query_params['show'] == '1'
+        else:
+            st.session_state.show_numbers = False
 
     # 初始化开始日期（使用文件持久化）
     if 'start_date' not in st.session_state:
@@ -1473,7 +1478,10 @@ def main():
         else:
             button_label = "🙈 显示金额"
         if st.button(button_label, key="toggle_numbers"):
+            # 切换状态并更新 URL
             st.session_state.show_numbers = not st.session_state.show_numbers
+            # 更新 URL 参数
+            st.query_params['show'] = '1' if st.session_state.show_numbers else '0'
             st.rerun()
 
     # 计算总资产的涨幅
