@@ -1425,13 +1425,16 @@ def main():
     latest = portfolio_data.iloc[-1]
 
     # 第一行：总资产信息（标题 + 按钮）
-    col_header, col_toggle = st.columns([5, 1])
+    col_header, col_toggle = st.columns([3, 2])
     with col_header:
         st.markdown("### 💰 总资产概览")
 
     with col_toggle:
-        eye_icon = "👁️" if st.session_state.show_numbers else "🙈"
-        if st.button(f"{eye_icon}", key="toggle_numbers", help="隐藏/显示金额"):
+        if st.session_state.show_numbers:
+            button_label = "👁️ 隐藏金额"
+        else:
+            button_label = "🙈 显示金额"
+        if st.button(button_label, key="toggle_numbers"):
             st.session_state.show_numbers = not st.session_state.show_numbers
             st.rerun()
 
