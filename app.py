@@ -91,7 +91,7 @@ def load_data(start_date_str):
 
 
 def calculate_change_percentages(portfolio_data, asset_name='总资产'):
-    """计算不同时间段的涨跌幅"""
+    """计算不同时间段的涨跌幅和金额变化"""
     if portfolio_data is None or portfolio_data.empty or len(portfolio_data) < 2:
         return None
 
@@ -102,7 +102,11 @@ def calculate_change_percentages(portfolio_data, asset_name='总资产'):
         'daily_change': None,
         'weekly_change': None,
         'monthly_change': None,
-        'total_change': None
+        'total_change': None,
+        'daily_change_amount': None,
+        'weekly_change_amount': None,
+        'monthly_change_amount': None,
+        'total_change_amount': None
     }
 
     # 日涨幅（相比前一天）
@@ -110,24 +114,28 @@ def calculate_change_percentages(portfolio_data, asset_name='总资产'):
         previous = portfolio_data[asset_name].iloc[-2]
         if previous > 0:
             result['daily_change'] = ((latest - previous) / previous * 100)
+            result['daily_change_amount'] = latest - previous
 
     # 周涨幅（相比7天前）
     if len(portfolio_data) >= 7:
         week_ago = portfolio_data[asset_name].iloc[-7]
         if week_ago > 0:
             result['weekly_change'] = ((latest - week_ago) / week_ago * 100)
+            result['weekly_change_amount'] = latest - week_ago
 
     # 月涨幅（相比30天前）
     if len(portfolio_data) >= 30:
         month_ago = portfolio_data[asset_name].iloc[-30]
         if month_ago > 0:
             result['monthly_change'] = ((latest - month_ago) / month_ago * 100)
+            result['monthly_change_amount'] = latest - month_ago
 
     # 总涨幅（相比第一天）
     if len(portfolio_data) >= 2:
         first = portfolio_data[asset_name].iloc[0]
         if first > 0:
             result['total_change'] = ((latest - first) / first * 100)
+            result['total_change_amount'] = latest - first
 
     return result
 
@@ -1472,10 +1480,16 @@ def main():
     with col_total1:
         # 根据show_numbers状态决定是否显示金额
         if st.session_state.show_numbers:
+            # 构建delta字符串：百分比 + 金额
+            delta_text = None
+            if total_stats['daily_change'] is not None:
+                amount_str = f"¥{total_stats['daily_change_amount']:,.2f}" if total_stats['daily_change_amount'] is not None else ""
+                delta_text = f"{total_stats['daily_change']:+.2f}% ({amount_str})"
+
             st.metric(
                 "当前总金额",
                 f"¥{latest['总资产']:,.2f}",
-                delta=f"{total_stats['daily_change']:+.2f}%" if total_stats['daily_change'] is not None else None,
+                delta=delta_text,
                 help="相比前一天的涨跌幅"
             )
         else:
@@ -1487,13 +1501,17 @@ def main():
 
     with col_total2:
         if total_stats['weekly_change'] is not None:
-            st.metric("近一周", f"{total_stats['weekly_change']:+.2f}%", help="相比7天前的涨跌幅")
+            amount_str = f"¥{total_stats['weekly_change_amount']:,.2f}" if total_stats['weekly_change_amount'] is not None else ""
+            delta_text = f"{total_stats['weekly_change']:+.2f}% ({amount_str})"
+            st.metric("近一周", delta_text, help="相比7天前的涨跌幅")
         else:
             st.metric("近一周", "暂无数据")
 
     with col_total3:
         if total_stats['monthly_change'] is not None:
-            st.metric("近一月", f"{total_stats['monthly_change']:+.2f}%", help="相比30天前的涨跌幅")
+            amount_str = f"¥{total_stats['monthly_change_amount']:,.2f}" if total_stats['monthly_change_amount'] is not None else ""
+            delta_text = f"{total_stats['monthly_change']:+.2f}% ({amount_str})"
+            st.metric("近一月", delta_text, help="相比30天前的涨跌幅")
         else:
             st.metric("近一月", "暂无数据")
 
@@ -1524,10 +1542,16 @@ def main():
 
             # 金额（根据show_numbers状态决定是否显示）
             if st.session_state.show_numbers:
+                # 构建delta字符串：百分比 + 金额
+                delta_text = None
+                if asset_stats and asset_stats['daily_change'] is not None:
+                    amount_str = f"¥{asset_stats['daily_change_amount']:,.2f}" if asset_stats.get('daily_change_amount') is not None else ""
+                    delta_text = f"{asset_stats['daily_change']:+.2f}% ({amount_str})"
+
                 st.metric(
                     "总金额",
                     f"¥{amount:,.2f}",
-                    delta=f"{asset_stats['daily_change']:+.2f}%" if asset_stats and asset_stats['daily_change'] is not None else None
+                    delta=delta_text
                 )
             else:
                 # 隐藏金额显示
@@ -1558,13 +1582,17 @@ def main():
 
                 if asset_stats:
                     if asset_stats['daily_change'] is not None:
-                        st.metric("日涨幅", f"{asset_stats['daily_change']:+.2f}%")
+                        amount_str = f"¥{asset_stats['daily_change_amount']:,.2f}" if asset_stats.get('daily_change_amount') is not None else ""
+                        st.metric("日涨幅", f"{asset_stats['daily_change']:+.2f}% ({amount_str})")
                     if asset_stats['weekly_change'] is not None:
-                        st.metric("近一周", f"{asset_stats['weekly_change']:+.2f}%")
+                        amount_str = f"¥{asset_stats['weekly_change_amount']:,.2f}" if asset_stats.get('weekly_change_amount') is not None else ""
+                        st.metric("近一周", f"{asset_stats['weekly_change']:+.2f}% ({amount_str})")
                     if asset_stats['monthly_change'] is not None:
-                        st.metric("近一月", f"{asset_stats['monthly_change']:+.2f}%")
+                        amount_str = f"¥{asset_stats['monthly_change_amount']:,.2f}" if asset_stats.get('monthly_change_amount') is not None else ""
+                        st.metric("近一月", f"{asset_stats['monthly_change']:+.2f}% ({amount_str})")
                     if asset_stats['total_change'] is not None:
-                        st.metric("累计涨幅", f"{asset_stats['total_change']:+.2f}%")
+                        amount_str = f"¥{asset_stats['total_change_amount']:,.2f}" if asset_stats.get('total_change_amount') is not None else ""
+                        st.metric("累计涨幅", f"{asset_stats['total_change']:+.2f}% ({amount_str})")
 
     st.markdown("---")
 
