@@ -1525,11 +1525,13 @@ def main():
                 col = st.container()
                 col.markdown(
                     f"""
-                    <div style="display: flex; flex-direction: column; align-items: flex-start; margin: 10px 0;">
-                        <div style="font-size: 14px; color: #666; margin-bottom: 4px;">近一周</div>
-                        <div style="font-size: 24px; font-weight: bold;">{total_stats['weekly_change']:+.2f}%</div>
-                        <div style="font-size: 16px; color: {weekly_delta_color}; font-weight: 500; margin-top: 4px;">
-                            {weekly_delta_str}
+                    <div style="background-color: white; padding: 16px; border-radius: 8px; border: 1px solid #f0f0f0; margin: 8px 0;">
+                        <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                            <div style="font-size: 14px; color: #666; margin-bottom: 8px; font-weight: 400;">近一周</div>
+                            <div style="font-size: 28px; font-weight: 600; color: #1f1f1f; line-height: 1.2;">{total_stats['weekly_change']:+.2f}%</div>
+                            <div style="font-size: 18px; color: {weekly_delta_color}; font-weight: 500; margin-top: 8px; display: flex; align-items: center;">
+                                {weekly_delta_str}
+                            </div>
                         </div>
                     </div>
                     """,
@@ -1557,11 +1559,13 @@ def main():
                 col = st.container()
                 col.markdown(
                     f"""
-                    <div style="display: flex; flex-direction: column; align-items: flex-start; margin: 10px 0;">
-                        <div style="font-size: 14px; color: #666; margin-bottom: 4px;">近一月</div>
-                        <div style="font-size: 24px; font-weight: bold;">{total_stats['monthly_change']:+.2f}%</div>
-                        <div style="font-size: 16px; color: {monthly_delta_color}; font-weight: 500; margin-top: 4px;">
-                            {monthly_delta_str}
+                    <div style="background-color: white; padding: 16px; border-radius: 8px; border: 1px solid #f0f0f0; margin: 8px 0;">
+                        <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                            <div style="font-size: 14px; color: #666; margin-bottom: 8px; font-weight: 400;">近一月</div>
+                            <div style="font-size: 28px; font-weight: 600; color: #1f1f1f; line-height: 1.2;">{total_stats['monthly_change']:+.2f}%</div>
+                            <div style="font-size: 18px; color: {monthly_delta_color}; font-weight: 500; margin-top: 8px; display: flex; align-items: center;">
+                                {monthly_delta_str}
+                            </div>
                         </div>
                     </div>
                     """,
