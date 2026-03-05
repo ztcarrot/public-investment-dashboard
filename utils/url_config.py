@@ -64,7 +64,15 @@ class URLConfigManager:
     """基于 URL 的配置管理器"""
 
     def __init__(self):
-        self.query_params = st.query_params
+        # 延迟访问 query_params，避免导入时出错
+        self._query_params = None
+
+    @property
+    def query_params(self):
+        """延迟获取 query_params"""
+        if self._query_params is None:
+            self._query_params = st.query_params
+        return self._query_params
 
     def load_date(self) -> Optional[datetime.date]:
         """从 URL 加载日期配置"""
