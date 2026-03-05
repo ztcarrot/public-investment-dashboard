@@ -43,6 +43,11 @@ st.markdown("""
         display: block !important;
     }
 }
+
+/* 确保metric组件中的数字右对齐 */
+[data-testid="stMetricValue"] {
+    text-align: right;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1501,65 +1506,39 @@ def main():
 
     with col_total2:
         if total_stats['weekly_change'] is not None:
-            # 使用自定义样式显示，红色涨绿色跌
-            color = "#ff4b4b" if total_stats['weekly_change'] > 0 else "#26c281"
-            icon = "↑" if total_stats['weekly_change'] > 0 else "↓" if total_stats['weekly_change'] < 0 else "→"
-
-            # 根据show_numbers决定是否显示金额
+            # 使用 st.metric，红涨绿跌
             if st.session_state.show_numbers and total_stats['weekly_change_amount'] is not None:
                 amount_str = f"¥{total_stats['weekly_change_amount']:,.2f}"
-                value_html = f"""
-                <div style="text-align: center;">
-                    <div style="color: {color}; font-weight: bold; font-size: 1.5em;">
-                        {icon} {abs(total_stats['weekly_change']):.2f}%
-                    </div>
-                    <div style="color: #666; font-size: 0.9em; margin-top: 4px;">{amount_str}</div>
-                </div>
-                """
+                delta_text = f"{total_stats['weekly_change']:+.2f}% ({amount_str})"
             else:
-                value_html = f"""
-                <div style="text-align: center;">
-                    <div style="color: {color}; font-weight: bold; font-size: 1.5em;">
-                        {icon} {abs(total_stats['weekly_change']):.2f}%
-                    </div>
-                </div>
-                """
+                delta_text = f"{total_stats['weekly_change']:+.2f}%"
 
-            st.markdown("##### 近一周")
-            st.markdown(value_html, unsafe_allow_html=True)
-            st.caption("相比7天前的涨跌幅")
+            st.metric(
+                "近一周",
+                delta_text,
+                delta=total_stats['weekly_change'],
+                delta_color="inverse",
+                help="相比7天前的涨跌幅"
+            )
         else:
             st.metric("近一周", "暂无数据")
 
     with col_total3:
         if total_stats['monthly_change'] is not None:
-            # 使用自定义样式显示，红色涨绿色跌
-            color = "#ff4b4b" if total_stats['monthly_change'] > 0 else "#26c281"
-            icon = "↑" if total_stats['monthly_change'] > 0 else "↓" if total_stats['monthly_change'] < 0 else "→"
-
-            # 根据show_numbers决定是否显示金额
+            # 使用 st.metric，红涨绿跌
             if st.session_state.show_numbers and total_stats['monthly_change_amount'] is not None:
                 amount_str = f"¥{total_stats['monthly_change_amount']:,.2f}"
-                value_html = f"""
-                <div style="text-align: center;">
-                    <div style="color: {color}; font-weight: bold; font-size: 1.5em;">
-                        {icon} {abs(total_stats['monthly_change']):.2f}%
-                    </div>
-                    <div style="color: #666; font-size: 0.9em; margin-top: 4px;">{amount_str}</div>
-                </div>
-                """
+                delta_text = f"{total_stats['monthly_change']:+.2f}% ({amount_str})"
             else:
-                value_html = f"""
-                <div style="text-align: center;">
-                    <div style="color: {color}; font-weight: bold; font-size: 1.5em;">
-                        {icon} {abs(total_stats['monthly_change']):.2f}%
-                    </div>
-                </div>
-                """
+                delta_text = f"{total_stats['monthly_change']:+.2f}%"
 
-            st.markdown("##### 近一月")
-            st.markdown(value_html, unsafe_allow_html=True)
-            st.caption("相比30天前的涨跌幅")
+            st.metric(
+                "近一月",
+                delta_text,
+                delta=total_stats['monthly_change'],
+                delta_color="inverse",
+                help="相比30天前的涨跌幅"
+            )
         else:
             st.metric("近一月", "暂无数据")
 
