@@ -30,6 +30,22 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# 注入CSS：移动端检测样式
+st.markdown("""
+<style>
+/* 移动端提示 - 只在屏幕宽度 <= 768px 时显示 */
+.mobile-only-warning {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .mobile-only-warning {
+        display: block !important;
+    }
+}
+</style>
+""", unsafe_allow_html=True)
+
 
 def load_data(start_date_str):
     """加载或抓取数据
@@ -1329,8 +1345,14 @@ def main():
 
     st.title("📊 永久投资组合仪表盘")
 
-    # 移动端浏览建议
-    st.warning("💻 建议使用电脑浏览以获得最佳体验（移动端浏览可能显示效果受限）")
+    # 移动端浏览建议（只在移动端显示）
+    st.markdown("""
+    <div class="mobile-only-warning stWarning">
+        <div style="padding: 1rem; border-radius: 0.5rem; background-color: #FFFAEB; color: #663800; border: 1px solid #FCD34D; margin-bottom: 1rem;">
+            💻 建议使用电脑浏览以获得最佳体验（移动端浏览可能显示效果受限）
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     # 检查是否使用默认配置（URL中没有assets参数）
     query_params = st.query_params
@@ -1361,8 +1383,6 @@ def main():
             4. 下次访问直接打开保存的网址即可
 
             💡 **想先逛逛？** 没问题！您可以先随意浏览一下默认配置下的图表和数据展示，看看这个应用能做什么。等您觉得不错了，再点击左侧的 ⚙️ 配置管理 配置您自己的资产也不迟~
-
-            💻 **浏览建议**：建议使用电脑浏览以获得最佳体验（移动端浏览可能显示效果受限）
             """)
         st.markdown("---")
 
