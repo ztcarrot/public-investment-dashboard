@@ -1517,13 +1517,25 @@ def main():
         if total_stats['weekly_change'] is not None:
             # 使用 st.metric，红涨绿跌
             if st.session_state.show_numbers and total_stats['weekly_change_amount'] is not None:
-                st.metric(
-                    "近一周",
-                    f"{total_stats['weekly_change']:+.2f}%",
-                    delta=total_stats['weekly_change_amount'],
-                    delta_color="off" if total_stats['weekly_change'] == 0 else "inverse",
-                    help=f"相比7天前的涨跌幅"
+                # 使用自定义格式化的 delta（带货币符号），同时保持箭头和颜色正确
+                weekly_amount = total_stats['weekly_change_amount']
+                weekly_delta_str = f"{'↑' if weekly_amount > 0 else '↓' if weekly_amount < 0 else '→'} ¥{abs(weekly_amount):,.2f}"
+                weekly_delta_color = "#ff4b4b" if weekly_amount > 0 else "#26c281" if weekly_amount < 0 else "#666"
+
+                col = st.container()
+                col.markdown(
+                    f"""
+                    <div style="display: flex; flex-direction: column; align-items: flex-start; margin: 10px 0;">
+                        <div style="font-size: 14px; color: #666; margin-bottom: 4px;">近一周</div>
+                        <div style="font-size: 24px; font-weight: bold;">{total_stats['weekly_change']:+.2f}%</div>
+                        <div style="font-size: 16px; color: {weekly_delta_color}; font-weight: 500; margin-top: 4px;">
+                            {weekly_delta_str}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
                 )
+            else:
             else:
                 # 隐藏模式：不显示 delta
                 st.metric(
@@ -1538,13 +1550,25 @@ def main():
         if total_stats['monthly_change'] is not None:
             # 使用 st.metric，红涨绿跌
             if st.session_state.show_numbers and total_stats['monthly_change_amount'] is not None:
-                st.metric(
-                    "近一月",
-                    f"{total_stats['monthly_change']:+.2f}%",
-                    delta=total_stats['monthly_change_amount'],
-                    delta_color="off" if total_stats['monthly_change'] == 0 else "inverse",
-                    help=f"相比30天前的涨跌幅"
+                # 使用自定义格式化的 delta（带货币符号），同时保持箭头和颜色正确
+                monthly_amount = total_stats['monthly_change_amount']
+                monthly_delta_str = f"{'↑' if monthly_amount > 0 else '↓' if monthly_amount < 0 else '→'} ¥{abs(monthly_amount):,.2f}"
+                monthly_delta_color = "#ff4b4b" if monthly_amount > 0 else "#26c281" if monthly_amount < 0 else "#666"
+
+                col = st.container()
+                col.markdown(
+                    f"""
+                    <div style="display: flex; flex-direction: column; align-items: flex-start; margin: 10px 0;">
+                        <div style="font-size: 14px; color: #666; margin-bottom: 4px;">近一月</div>
+                        <div style="font-size: 24px; font-weight: bold;">{total_stats['monthly_change']:+.2f}%</div>
+                        <div style="font-size: 16px; color: {monthly_delta_color}; font-weight: 500; margin-top: 4px;">
+                            {monthly_delta_str}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
                 )
+            else:
             else:
                 # 隐藏模式：不显示 delta
                 st.metric(
