@@ -1517,13 +1517,13 @@ def main():
         if total_stats['weekly_change'] is not None:
             # 使用 st.metric，红涨绿跌
             if st.session_state.show_numbers and total_stats['weekly_change_amount'] is not None:
-                amount_str = f"¥{abs(total_stats['weekly_change_amount']):,.2f}"
+                amount_str = f"¥{total_stats['weekly_change_amount']:,.2f}"
                 st.metric(
                     "近一周",
                     f"{total_stats['weekly_change']:+.2f}%",
-                    delta=f"{total_stats['weekly_change']:+.2f}%",
+                    delta=amount_str,
                     delta_color="off" if total_stats['weekly_change'] == 0 else "inverse",
-                    help=f"相比7天前的涨跌幅 (金额变化: {amount_str})"
+                    help=f"相比7天前的涨跌幅"
                 )
             else:
                 # 隐藏模式：不显示 delta
@@ -1539,13 +1539,13 @@ def main():
         if total_stats['monthly_change'] is not None:
             # 使用 st.metric，红涨绿跌
             if st.session_state.show_numbers and total_stats['monthly_change_amount'] is not None:
-                amount_str = f"¥{abs(total_stats['monthly_change_amount']):,.2f}"
+                amount_str = f"¥{total_stats['monthly_change_amount']:,.2f}"
                 st.metric(
                     "近一月",
                     f"{total_stats['monthly_change']:+.2f}%",
-                    delta=f"{total_stats['monthly_change']:+.2f}%",
+                    delta=amount_str,
                     delta_color="off" if total_stats['monthly_change'] == 0 else "inverse",
-                    help=f"相比30天前的涨跌幅 (金额变化: {amount_str})"
+                    help=f"相比30天前的涨跌幅"
                 )
             else:
                 # 隐藏模式：不显示 delta
@@ -1646,10 +1646,10 @@ def main():
                 st.markdown(f"#### {asset_info['icon']} {asset_name}")
 
                 if asset_stats:
-                    # 涨跌幅详情折叠面板：始终只显示百分比，不显示金额
+                    # 涨跌幅详情折叠面板：根据 show_numbers 显示金额或百分比
                     # 红色代表涨，绿色代表跌
 
-                    def format_change(value, label):
+                    def format_change(value, label, amount_key=None):
                         """格式化涨跌幅显示，红色涨绿色跌"""
                         if value is None:
                             return None
@@ -1657,22 +1657,32 @@ def main():
                         color = "#ff4b4b" if value > 0 else "#26c281"  # 红涨绿跌
                         icon = "↑" if value > 0 else "↓" if value < 0 else "→"
 
+                        # 根据设置显示金额或百分比
+                        if st.session_state.show_numbers and amount_key is not None:
+                            amount = asset_stats.get(amount_key)
+                            if amount is not None:
+                                display_value = f"¥{amount:,.2f}"
+                            else:
+                                display_value = f"{abs(value):.2f}%"
+                        else:
+                            display_value = f"{abs(value):.2f}%"
+
                         st.markdown(
                             f"""
                             <div style="display: flex; justify-content: space-between; align-items: center; margin: 8px 0;">
                                 <span style="color: #666;">{label}</span>
                                 <span style="color: {color}; font-weight: bold; font-size: 1.1em;">
-                                    {icon} {abs(value):.2f}%
+                                    {icon} {display_value}
                                 </span>
                             </div>
                             """,
                             unsafe_allow_html=True
                         )
 
-                    format_change(asset_stats['daily_change'], "日涨幅")
-                    format_change(asset_stats['weekly_change'], "近一周")
-                    format_change(asset_stats['monthly_change'], "近一月")
-                    format_change(asset_stats['total_change'], "累计涨幅")
+                    format_change(asset_stats['daily_change'], "日涨幅", "daily_change_amount")
+                    format_change(asset_stats['weekly_change'], "近一周", "weekly_change_amount")
+                    format_change(asset_stats['monthly_change'], "近一月", "monthly_change_amount")
+                    format_change(asset_stats['total_change'], "累计涨幅", "total_change_amount")
 
     st.markdown("---")
 
