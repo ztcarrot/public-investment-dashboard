@@ -1338,7 +1338,7 @@ def main():
         st.markdown("---")
         st.info("### 👋 欢迎使用投资组合仪表盘！")
 
-        with st.expander("📖 了解更多", expanded=False):
+        with st.expander("🎯 快速上手", expanded=True):
             st.markdown("""
             ### 🎯 永久投资组合追踪
 
