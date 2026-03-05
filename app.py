@@ -1503,7 +1503,6 @@ def main():
                 "当前总金额",
                 f"¥{latest['总资产']:,.2f}",
                 delta=delta_text,
-                delta=total_stats['daily_change'],
                 delta_color="inverse",
                 help="相比前一天的涨跌幅"
             )
