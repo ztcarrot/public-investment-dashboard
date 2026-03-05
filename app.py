@@ -1493,18 +1493,27 @@ def main():
     with col_total1:
         # 根据show_numbers状态决定是否显示金额
         if st.session_state.show_numbers:
-            # 构建delta字符串：百分比 + 金额
-            delta_text = None
-            if total_stats['daily_change'] is not None:
-                amount_str = f"¥{total_stats['daily_change_amount']:,.2f}" if total_stats['daily_change_amount'] is not None else ""
-                delta_text = f"{total_stats['daily_change']:+.2f}% ({amount_str})"
+            # 使用自定义样式显示，红涨绿跌
+            st.markdown("##### 当前总金额")
+            st.markdown(f"###### ¥{latest['总资产']:,.2f}")
 
-            st.metric(
-                "当前总金额",
-                f"¥{latest['总资产']:,.2f}",
-                delta=delta_text,
-                help="相比前一天的涨跌幅"
-            )
+            if total_stats['daily_change'] is not None:
+                color = "#ff4b4b" if total_stats['daily_change'] > 0 else "#26c281"
+                icon = "↑" if total_stats['daily_change'] > 0 else "↓" if total_stats['daily_change'] < 0 else "→"
+                amount_str = f"¥{total_stats['daily_change_amount']:,.2f}" if total_stats['daily_change_amount'] is not None else ""
+
+                st.markdown(
+                    f"""
+                    <div style="margin-top: 8px;">
+                        <span style="color: {color}; font-weight: bold; font-size: 1.2em;">
+                            {icon} {abs(total_stats['daily_change']):.2f}%
+                        </span>
+                        {f'<span style="color: #666; font-size: 0.9em; margin-left: 8px;">({amount_str})</span>' if amount_str else ''}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+                st.caption("相比前一天的涨跌幅")
         else:
             # 隐藏金额，使用markdown显示
             st.markdown("### 当前总金额")
