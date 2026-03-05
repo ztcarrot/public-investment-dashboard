@@ -1522,7 +1522,7 @@ def main():
                     "近一周",
                     f"{total_stats['weekly_change']:+.2f}%",
                     delta=f"{total_stats['weekly_change']:+.2f}%",
-                    delta_color="inverse" if total_stats['weekly_change'] > 0 else ("normal" if total_stats['weekly_change'] < 0 else "off"),
+                    delta_color="off" if total_stats['weekly_change'] == 0 else "inverse",
                     help=f"相比7天前的涨跌幅 (金额变化: {amount_str})"
                 )
             else:
@@ -1544,7 +1544,7 @@ def main():
                     "近一月",
                     f"{total_stats['monthly_change']:+.2f}%",
                     delta=f"{total_stats['monthly_change']:+.2f}%",
-                    delta_color="inverse" if total_stats['monthly_change'] > 0 else ("normal" if total_stats['monthly_change'] < 0 else "off"),
+                    delta_color="off" if total_stats['monthly_change'] == 0 else "inverse",
                     help=f"相比30天前的涨跌幅 (金额变化: {amount_str})"
                 )
             else:
