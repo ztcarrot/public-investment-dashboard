@@ -1603,10 +1603,24 @@ def main():
                     st.caption(f"日涨跌: {asset_stats['daily_change']:+.2f}%")
 
             # 占比（始终显示）
-            st.metric(
-                "占比",
-                f"{percentage:.2f}%"
-            )
+            is_imbalanced = percentage < 15 or percentage > 35
+
+            if is_imbalanced:
+                st.markdown(
+                    f"""
+                    <div style="background-color: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 12px; margin-top: 10px;">
+                        <div style="font-size: 0.9em; font-weight: bold; color: #856404;">占比</div>
+                        <div style="font-size: 1.5em; font-weight: bold; color: #d97706;">{percentage:.2f}%</div>
+                        <div style="font-size: 0.8em; color: #dc3545; font-weight: bold; margin-top: 4px;">⚠️ 不平衡</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            else:
+                st.metric(
+                    "占比",
+                    f"{percentage:.2f}%"
+                )
 
     st.markdown("---")
 
