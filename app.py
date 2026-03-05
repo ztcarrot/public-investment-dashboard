@@ -1517,11 +1517,10 @@ def main():
                     help="相比7天前的涨跌幅"
                 )
             else:
+                # 隐藏模式：不显示 delta
                 st.metric(
                     "近一周",
                     f"{total_stats['weekly_change']:+.2f}%",
-                    delta=f"{total_stats['weekly_change']:+.2f}%",
-                    delta_color="inverse" if total_stats['weekly_change'] > 0 else ("normal" if total_stats['weekly_change'] < 0 else "off"),
                     help="相比7天前的涨跌幅"
                 )
         else:
@@ -1540,11 +1539,10 @@ def main():
                     help="相比30天前的涨跌幅"
                 )
             else:
+                # 隐藏模式：不显示 delta
                 st.metric(
                     "近一月",
                     f"{total_stats['monthly_change']:+.2f}%",
-                    delta=f"{total_stats['monthly_change']:+.2f}%",
-                    delta_color="inverse" if total_stats['monthly_change'] > 0 else ("normal" if total_stats['monthly_change'] < 0 else "off"),
                     help="相比30天前的涨跌幅"
                 )
         else:
