@@ -1509,17 +1509,21 @@ def main():
             # 使用 st.metric，红涨绿跌
             if st.session_state.show_numbers and total_stats['weekly_change_amount'] is not None:
                 amount_str = f"¥{total_stats['weekly_change_amount']:,.2f}"
-                delta_text = f"{total_stats['weekly_change']:+.2f}% ({amount_str})"
+                st.metric(
+                    "近一周",
+                    f"{total_stats['weekly_change']:+.2f}%",
+                    delta=amount_str,
+                    delta_color="inverse" if total_stats['weekly_change'] > 0 else ("normal" if total_stats['weekly_change'] < 0 else "off"),
+                    help="相比7天前的涨跌幅"
+                )
             else:
-                delta_text = f"{total_stats['weekly_change']:+.2f}%"
-
-            st.metric(
-                "近一周",
-                delta_text,
-                delta=total_stats['weekly_change'],
-                delta_color="inverse",
-                help="相比7天前的涨跌幅"
-            )
+                st.metric(
+                    "近一周",
+                    f"{total_stats['weekly_change']:+.2f}%",
+                    delta=f"{total_stats['weekly_change']:+.2f}%",
+                    delta_color="inverse" if total_stats['weekly_change'] > 0 else ("normal" if total_stats['weekly_change'] < 0 else "off"),
+                    help="相比7天前的涨跌幅"
+                )
         else:
             st.metric("近一周", "暂无数据")
 
@@ -1528,17 +1532,21 @@ def main():
             # 使用 st.metric，红涨绿跌
             if st.session_state.show_numbers and total_stats['monthly_change_amount'] is not None:
                 amount_str = f"¥{total_stats['monthly_change_amount']:,.2f}"
-                delta_text = f"{total_stats['monthly_change']:+.2f}% ({amount_str})"
+                st.metric(
+                    "近一月",
+                    f"{total_stats['monthly_change']:+.2f}%",
+                    delta=amount_str,
+                    delta_color="inverse" if total_stats['monthly_change'] > 0 else ("normal" if total_stats['monthly_change'] < 0 else "off"),
+                    help="相比30天前的涨跌幅"
+                )
             else:
-                delta_text = f"{total_stats['monthly_change']:+.2f}%"
-
-            st.metric(
-                "近一月",
-                delta_text,
-                delta=total_stats['monthly_change'],
-                delta_color="inverse",
-                help="相比30天前的涨跌幅"
-            )
+                st.metric(
+                    "近一月",
+                    f"{total_stats['monthly_change']:+.2f}%",
+                    delta=f"{total_stats['monthly_change']:+.2f}%",
+                    delta_color="inverse" if total_stats['monthly_change'] > 0 else ("normal" if total_stats['monthly_change'] < 0 else "off"),
+                    help="相比30天前的涨跌幅"
+                )
         else:
             st.metric("近一月", "暂无数据")
 
