@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-投资组合仪表盘 - 主应用
+永久投资组合仪表盘 - 主应用
 """
 
 import streamlit as st
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 # 页面配置
 st.set_page_config(
-    page_title="投资组合仪表盘",
+    page_title="永久投资组合仪表盘",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -1327,7 +1327,7 @@ def main():
         render_config_manager()
         return
 
-    st.title("📊 投资组合仪表盘")
+    st.title("📊 永久投资组合仪表盘")
 
     # 检查是否使用默认配置（URL中没有assets参数）
     query_params = st.query_params
@@ -1336,7 +1336,7 @@ def main():
     # 只在没有自定义配置时显示欢迎信息
     if not has_custom_assets:
         st.markdown("---")
-        st.info("### 👋 欢迎使用投资组合仪表盘！")
+        st.info("### 👋 欢迎使用永久投资组合仪表盘！")
 
         with st.expander("🎯 快速上手", expanded=True):
             st.markdown("""
