@@ -1536,7 +1536,6 @@ def main():
                     unsafe_allow_html=True
                 )
             else:
-            else:
                 # 隐藏模式：不显示 delta
                 st.metric(
                     "近一周",
@@ -1568,7 +1567,6 @@ def main():
                     """,
                     unsafe_allow_html=True
                 )
-            else:
             else:
                 # 隐藏模式：不显示 delta
                 st.metric(
