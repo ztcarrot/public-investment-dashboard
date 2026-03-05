@@ -1612,13 +1612,31 @@ def main():
                         <div style="font-size: 0.9em; font-weight: bold; color: #856404;">占比</div>
                         <div style="font-size: 1.5em; font-weight: bold; color: #d97706;">{percentage:.2f}%</div>
                         <div style="font-size: 0.8em; color: #dc3545; font-weight: bold; margin-top: 4px;">⚠️ 不平衡</div>
-                        <div style="font-size: 0.75em; color: #666; margin-top: 6px; line-height: 1.3;">
-                            💡 永久投资组合理想配置为各25%，低于15%配置过低影响收益，高于35%增加集中风险
-                        </div>
                     </div>
                     """,
                     unsafe_allow_html=True
                 )
+                with st.expander("❓ 为何显示不平衡？", expanded=False):
+                    st.markdown("""
+                    **永久投资组合理想配置**
+
+                    四大核心资产各占 **25%**，实现风险分散和长期稳定增值：
+
+                    - 📈 **股票**：增长驱动
+                    - 🏅 **黄金**：保值避险
+                    - 💵 **现金**：流动性
+                    - 📜 **国债**：稳定收益
+
+                    **当前配置分析**
+
+                    - 📉 **低于 15%**：配置过低，可能影响整体收益
+                    - 📈 **高于 35%**：配置过高，增加集中风险
+                    - ✅ **15% - 35%**：合理范围内，适度偏离理想配置
+
+                    **建议**
+
+                    考虑调整至 **25% 左右**的平衡状态，实现真正的永久投资组合策略。
+                    """)
             else:
                 st.metric(
                     "占比",
