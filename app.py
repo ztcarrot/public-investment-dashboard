@@ -10,13 +10,13 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import logging
+import json
 
 from utils.data_fetcher import DataFetcher
 from utils.config_manager import get_default_assets, parse_secrets_assets, validate_asset
 from utils.local_storage import save_to_session, load_from_session
 from utils.date_config import date_config_manager
 from utils.assets_config import assets_config_manager
-import json
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -1501,25 +1501,65 @@ def main():
 
     with col_total2:
         if total_stats['weekly_change'] is not None:
+            # 使用自定义样式显示，红色涨绿色跌
+            color = "#ff4b4b" if total_stats['weekly_change'] > 0 else "#26c281"
+            icon = "↑" if total_stats['weekly_change'] > 0 else "↓" if total_stats['weekly_change'] < 0 else "→"
+
             # 根据show_numbers决定是否显示金额
-            if st.session_state.show_numbers:
-                amount_str = f"¥{total_stats['weekly_change_amount']:,.2f}" if total_stats['weekly_change_amount'] is not None else ""
-                delta_text = f"{total_stats['weekly_change']:+.2f}% ({amount_str})"
+            if st.session_state.show_numbers and total_stats['weekly_change_amount'] is not None:
+                amount_str = f"¥{total_stats['weekly_change_amount']:,.2f}"
+                value_html = f"""
+                <div style="text-align: center;">
+                    <div style="color: {color}; font-weight: bold; font-size: 1.5em;">
+                        {icon} {abs(total_stats['weekly_change']):.2f}%
+                    </div>
+                    <div style="color: #666; font-size: 0.9em; margin-top: 4px;">{amount_str}</div>
+                </div>
+                """
             else:
-                delta_text = f"{total_stats['weekly_change']:+.2f}%"
-            st.metric("近一周", delta_text, help="相比7天前的涨跌幅")
+                value_html = f"""
+                <div style="text-align: center;">
+                    <div style="color: {color}; font-weight: bold; font-size: 1.5em;">
+                        {icon} {abs(total_stats['weekly_change']):.2f}%
+                    </div>
+                </div>
+                """
+
+            st.markdown("##### 近一周")
+            st.markdown(value_html, unsafe_allow_html=True)
+            st.caption("相比7天前的涨跌幅")
         else:
             st.metric("近一周", "暂无数据")
 
     with col_total3:
         if total_stats['monthly_change'] is not None:
+            # 使用自定义样式显示，红色涨绿色跌
+            color = "#ff4b4b" if total_stats['monthly_change'] > 0 else "#26c281"
+            icon = "↑" if total_stats['monthly_change'] > 0 else "↓" if total_stats['monthly_change'] < 0 else "→"
+
             # 根据show_numbers决定是否显示金额
-            if st.session_state.show_numbers:
-                amount_str = f"¥{total_stats['monthly_change_amount']:,.2f}" if total_stats['monthly_change_amount'] is not None else ""
-                delta_text = f"{total_stats['monthly_change']:+.2f}% ({amount_str})"
+            if st.session_state.show_numbers and total_stats['monthly_change_amount'] is not None:
+                amount_str = f"¥{total_stats['monthly_change_amount']:,.2f}"
+                value_html = f"""
+                <div style="text-align: center;">
+                    <div style="color: {color}; font-weight: bold; font-size: 1.5em;">
+                        {icon} {abs(total_stats['monthly_change']):.2f}%
+                    </div>
+                    <div style="color: #666; font-size: 0.9em; margin-top: 4px;">{amount_str}</div>
+                </div>
+                """
             else:
-                delta_text = f"{total_stats['monthly_change']:+.2f}%"
-            st.metric("近一月", delta_text, help="相比30天前的涨跌幅")
+                value_html = f"""
+                <div style="text-align: center;">
+                    <div style="color: {color}; font-weight: bold; font-size: 1.5em;">
+                        {icon} {abs(total_stats['monthly_change']):.2f}%
+                    </div>
+                </div>
+                """
+
+            st.markdown("##### 近一月")
+            st.markdown(value_html, unsafe_allow_html=True)
+            st.caption("相比30天前的涨跌幅")
         else:
             st.metric("近一月", "暂无数据")
 
