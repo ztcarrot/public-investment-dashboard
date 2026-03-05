@@ -1654,18 +1654,23 @@ def main():
                         if value is None:
                             return None
 
-                        color = "#ff4b4b" if value > 0 else "#26c281"  # 红涨绿跌
-                        icon = "↑" if value > 0 else "↓" if value < 0 else "→"
-
                         # 根据设置显示金额或百分比
                         if st.session_state.show_numbers and amount_key is not None:
                             amount = asset_stats.get(amount_key)
                             if amount is not None:
                                 display_value = f"¥{amount:,.2f}"
+                                # 基于金额判断颜色和箭头
+                                change_value = amount
                             else:
                                 display_value = f"{abs(value):.2f}%"
+                                change_value = value
                         else:
                             display_value = f"{abs(value):.2f}%"
+                            change_value = value
+
+                        # 根据实际变化的值判断颜色和箭头
+                        color = "#ff4b4b" if change_value > 0 else "#26c281"  # 红涨绿跌
+                        icon = "↑" if change_value > 0 else "↓" if change_value < 0 else "→"
 
                         st.markdown(
                             f"""
