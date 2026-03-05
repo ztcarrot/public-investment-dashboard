@@ -1593,7 +1593,8 @@ def main():
                 st.metric(
                     "总金额",
                     f"¥{amount:,.2f}",
-                    delta=delta_text
+                    delta=delta_text,
+                    delta_color="inverse"
                 )
             else:
                 # 隐藏金额显示
