@@ -1078,6 +1078,193 @@ def render_data_table(historical_data, portfolio_data):
     )
 
 
+def render_fund_screener():
+    """渲染基金筛选页面"""
+    st.title("🔍 短债基金筛选")
+
+    from utils.fund_screener import screen_funds, AKSHARE_AVAILABLE
+    from utils.fund_cache import fund_cache_manager
+
+    # 检查 akshare 是否可用
+    if not AKSHARE_AVAILABLE:
+        st.error("❌ akshare 库不可用，请先安装：`pip install akshare`")
+        return
+
+    # 加载缓存数据
+    cache_age = fund_cache_manager.get_cache_age_days()
+    cache_data = fund_cache_manager.load()
+
+    # 顶部控制栏
+    col1, col2, col3 = st.columns([1, 2, 1])
+
+    with col1:
+        if st.button("🔄 刷新数据", use_container_width=True):
+            # 清除缓存并重新加载
+            fund_cache_manager.clear()
+            st.rerun()
+
+    with col2:
+        if cache_age >= 0:
+            st.info(f"📅 缓存时间: {cache_age} 天前")
+        else:
+            st.info("📅 暂无缓存")
+
+    with col3:
+        if st.button("🏠 返回首页", use_container_width=True):
+            st.session_state.current_page = 'dashboard'
+            st.session_state.page_selection = 0
+            st.rerun()
+
+    st.markdown("---")
+
+    # 检查缓存是否过期
+    is_expired = fund_cache_manager.is_expired(days=7)
+    has_data = cache_data is not None and not is_expired
+
+    if has_data:
+        # 使用缓存数据
+        screened_funds = cache_data.get('screened_funds', [])
+        total_funds = cache_data.get('total_funds', 0)
+
+        st.success(f"✅ 使用缓存数据：共筛选出 {len(screened_funds)} 只基金（从 {total_funds} 只短债基金中）")
+
+        # 展示筛选结果
+        _display_fund_results(screened_funds)
+
+    else:
+        # 重新获取数据
+        st.info("🔄 正在从 akshare 获取最新数据...")
+
+        # 创建进度条
+        progress_bar = st.progress(0, text="正在获取基金数据...")
+        status_text = st.empty()
+
+        def update_progress(current, total, fund_info):
+            """更新进度"""
+            if total > 0:
+                progress = min((current + 1) / total, 1.0)
+                progress_bar.progress(progress, text=f"正在获取基金数据... ({current + 1}/{total})")
+
+            if fund_info:
+                status_text.text(f"📊 正在处理: {fund_info.get('名称', '')} ({fund_info.get('代码', '')})")
+            else:
+                status_text.empty()
+
+        try:
+            # 执行筛选
+            result = screen_funds(progress_callback=update_progress)
+
+            if result:
+                # 保存到缓存
+                fund_cache_manager.save(result)
+
+                # 清空进度条
+                progress_bar.empty()
+                status_text.empty()
+
+                # 展示结果
+                screened_funds = result.get('screened_funds', [])
+                total_funds = result.get('total_funds', 0)
+
+                st.success(f"✅ 筛选完成：共找到 {len(screened_funds)} 只优质基金（从 {total_funds} 只短债基金中）")
+
+                # 展示筛选结果
+                _display_fund_results(screened_funds)
+            else:
+                progress_bar.empty()
+                status_text.empty()
+                st.error("❌ 获取基金数据失败，请稍后重试")
+
+        except Exception as e:
+            progress_bar.empty()
+            status_text.empty()
+            logger.error(f"基金筛选失败: {e}")
+            st.error(f"❌ 发生错误: {str(e)}")
+
+
+def _display_fund_results(funds: list):
+    """
+    展示基金筛选结果
+
+    Args:
+        funds: 基金列表
+    """
+    if not funds:
+        st.warning("⚠️ 没有找到符合条件的基金")
+        return
+
+    # 转换为 DataFrame
+    df = pd.DataFrame(funds)
+
+    # 格式化显示
+    display_df = df.copy()
+
+    # 格式化百分比列
+    if '年化收益率' in display_df.columns:
+        display_df['年化收益率'] = display_df['年化收益率'].apply(
+            lambda x: f"{x:+.2f}%" if pd.notna(x) else "N/A"
+        )
+
+    if '最大回撤' in display_df.columns:
+        display_df['最大回撤'] = display_df['最大回撤'].apply(
+            lambda x: f"{x:.2f}%" if pd.notna(x) else "N/A"
+        )
+
+    # 选择要显示的列
+    display_cols = ['基金代码', '基金简称', '年化收益率', '最大回撤']
+    if '基金类型' in display_df.columns:
+        display_cols.insert(2, '基金类型')
+    if '成立日期' in display_df.columns:
+        display_cols.append('成立日期')
+
+    # 只显示存在的列
+    display_cols = [col for col in display_cols if col in display_df.columns]
+
+    st.markdown("### 📊 筛选结果（前 30 名）")
+    st.dataframe(
+        display_df[display_cols],
+        use_container_width=True,
+        hide_index=True
+    )
+
+    # 添加操作说明
+    with st.expander("💡 如何添加到投资组合？"):
+        st.markdown("""
+        1. 记下感兴趣的基金代码（如 `005350`）
+        2. 点击左侧导航进入 **⚙️ 配置管理**
+        3. 点击 **➕ 添加资产**
+        4. 填写基金信息：
+           - **代码**: 基金代码
+           - **名称**: 基金名称
+           - **代码类型**: 债券
+           - **资产类别**: 现金
+           - **初始份额**: 购买的份额数量
+        5. 点击保存
+        """)
+
+    # 统计信息
+    with st.expander("📈 统计信息"):
+        if '年化收益率' in df.columns:
+            avg_return = df['年化收益率'].mean()
+            max_return = df['年化收益率'].max()
+            min_return = df['年化收益率'].min()
+
+            col1, col2, col3 = st.columns(3)
+            col1.metric("平均年化收益", f"{avg_return:.2f}%")
+            col2.metric("最高年化收益", f"{max_return:.2f}%")
+            col3.metric("最低年化收益", f"{min_return:.2f}%")
+
+        if '最大回撤' in df.columns:
+            avg_drawdown = df['最大回撤'].mean()
+            max_drawdown = df['最大回撤'].min()  # 最小值 = 最大回撤
+            min_drawdown = df['最大回撤'].max()  # 最大值 = 最小回撤
+
+            col1, col2, col3 = st.columns(3)
+            col1.metric("平均最大回撤", f"{avg_drawdown:.2f}%")
+            col2.metric("最大回撤（最差）", f"{max_drawdown:.2f}%")
+            col3.metric("最大回撤（最好）", f"{min_drawdown:.2f}%")
+
+
 def render_config_manager():
     """渲染配置管理页面 - 使用表单编辑"""
     # 返回首页按钮
