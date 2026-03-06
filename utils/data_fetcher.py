@@ -106,6 +106,284 @@ class DataFetcher:
             logger.error(f"获取基金 {fund_code} 历史数据出错: {e}")
             return []
 
+    def get_fund_historical_from_akshare(self, fund_code: str, start_date: str, end_date: str) -> List[Dict]:
+        """
+        使用 AkShare 获取基金历史净值
+
+        AkShare 的数据可能比东方财富更新更快，特别是对于 FOF 基金
+
+        Args:
+            fund_code: 基金代码
+            start_date: 开始日期 (YYYY-MM-DD)
+            end_date: 结束日期 (YYYY-MM-DD)
+
+        Returns:
+            历史数据列表
+        """
+        if not AKSHARE_AVAILABLE:
+            logger.warning("akshare 库不可用，无法使用 akshare 获取基金数据")
+            return []
+
+        try:
+            # 标准化基金代码
+            code = fund_code.zfill(6) if len(fund_code) < 6 else fund_code
+
+            logger.info(f"使用 AkShare 获取基金 {code} 的历史数据...")
+
+            # 转换日期格式: YYYY-MM-DD -> YYYYMMDD
+            start_date_str = start_date.replace('-', '')
+            end_date_str = end_date.replace('-', '')
+
+            result = []
+
+            # 尝试多个 AkShare 接口
+            # 方法1: fund_open_fund_info_em（东方财富源）
+            try:
+                df = ak.fund_open_fund_info_em(
+                    fund=code,
+                    indicator="单位净值",
+                    start_date=start_date_str,
+                    end_date=end_date_str
+                )
+
+                if df is not None and not df.empty:
+                    for _, row in df.iterrows():
+                        result.append({
+                            '日期': row['净值日期'],
+                            '净值': float(row['单位净值'])
+                        })
+
+                    if result:
+                        logger.info(f"AkShare (fund_open_fund_info_em) 获取到 {len(result)} 条历史数据")
+                        return result
+            except Exception as e:
+                logger.debug(f"AkShare fund_open_fund_info_em 失败: {e}")
+
+            # 方法2: fund_open_fund_daily_em（新浪源，可能更新更快）
+            try:
+                df = ak.fund_open_fund_daily_em(
+                    symbol=code,
+                    start_date=start_date_str,
+                    end_date=end_date_str,
+                    adjust="qfq"  # 前复权
+                )
+
+                if df is not None and not df.empty:
+                    for _, row in df.iterrows():
+                        # 检查列名
+                        date_col = '日期' if '日期' in df.columns else df.columns[0]
+                        nav_col = '单位净值' if '单位净值' in df.columns else 'close' if 'close' in df.columns else df.columns[1]
+
+                        result.append({
+                            '日期': row[date_col],
+                            '净值': float(row[nav_col])
+                        })
+
+                    if result:
+                        logger.info(f"AkShare (fund_open_fund_daily_em) 获取到 {len(result)} 条历史数据")
+                        return result
+            except Exception as e:
+                logger.debug(f"AkShare fund_open_fund_daily_em 失败: {e}")
+
+            # 方法3: fund_name_em（搜索基金信息）+ fund_etf_hist_em（ETF历史数据）
+            # 注意：这个方法主要用于ETF，对于FOF可能不适用
+            try:
+                # 尝试作为ETF获取
+                df = ak.fund_etf_hist_em(symbol=code, period="daily", start_date=start_date_str, end_date=end_date_str, adjust="qfq")
+                if df is not None and not df.empty:
+                    for _, row in df.iterrows():
+                        result.append({
+                            '日期': row['日期'],
+                            '净值': float(row['收盘'])
+                        })
+
+                    if result:
+                        logger.info(f"AkShare (fund_etf_hist_em) 获取到 {len(result)} 条历史数据")
+                        return result
+            except Exception as e:
+                logger.debug(f"AkShare fund_etf_hist_em 失败: {e}")
+
+            return []
+
+        except Exception as e:
+            logger.debug(f"AkShare 获取基金 {fund_code} 数据失败: {e}")
+            return []
+
+    def get_fund_historical_from_ttjj(self, fund_code: str, start_date: str, end_date: str) -> List[Dict]:
+        """
+        从天天基金获取基金历史净值（备用数据源）
+
+        天天基金的数据可能比东方财富更新更快
+
+        Args:
+            fund_code: 基金代码
+            start_date: 开始日期 (YYYY-MM-DD)
+            end_date: 结束日期 (YYYY-MM-DD)
+
+        Returns:
+            历史数据列表
+        """
+        try:
+            # 标准化基金代码
+            code = fund_code.zfill(6) if len(fund_code) < 6 else fund_code
+
+            # 天天基金历史净值API
+            url = f"http://fund.eastmoney.com/f10/F10DataApi.aspx"
+            params = {
+                'type': 'lsjz',
+                'code': code,
+                'page': 1,
+                'per': 1000,  # 获取更多数据
+                'sdate': start_date,
+                'edate': end_date,
+                'rt': int(datetime.now().timestamp())
+            }
+
+            response = requests.get(url, params=params, headers=self.headers, timeout=15)
+
+            if response.status_code != 200:
+                logger.debug(f"天天基金获取 {code} 数据失败: HTTP {response.status_code}")
+                return []
+
+            import json
+            content = response.text
+
+            # 解析返回的JSON数据
+            try:
+                data = json.loads(content)
+                if not data.get('data'):
+                    return []
+
+                # 解析HTML表格数据
+                from html.parser import HTMLParser
+
+                class TableParser(HTMLParser):
+                    def __init__(self):
+                        super().__init__()
+                        self.rows = []
+                        self.current_row = []
+                        self.in_td = False
+
+                    def handle_starttag(self, tag, attrs):
+                        if tag == 'td':
+                            self.in_td = True
+                            self.current_row = []
+
+                    def handle_endtag(self, tag):
+                        if tag == 'td':
+                            self.in_td = False
+
+                    def handle_data(self, data):
+                        if self.in_td:
+                            self.current_row.append(data.strip())
+
+                # 提取表格数据
+                match = re.search(r'<table[^>]*>(.*?)</table>', content, re.DOTALL)
+                if match:
+                    table_html = match.group(1)
+                    lines = table_html.split('<tr')
+
+                    result = []
+                    for line in lines:
+                        # 提取每行数据
+                        tds = re.findall(r'<td[^>]*>(.*?)</td>', line, re.DOTALL)
+                        if len(tds) >= 4:
+                            # 清理HTML标签
+                            clean_tds = []
+                            for td in tds:
+                                clean_td = re.sub(r'<[^>]+>', '', td).strip()
+                                clean_tds.append(clean_td)
+
+                            try:
+                                date_str = clean_tds[0]  # 净值日期
+                                nav = clean_tds[1]       # 单位净值
+
+                                if nav and float(nav) > 0:
+                                    # 验证日期格式
+                                    if len(date_str) == 10 and date_str[4] == '-' and date_str[7] == '-':
+                                        if start_date <= date_str <= end_date:
+                                            result.append({
+                                                '日期': date_str,
+                                                '净值': float(nav)
+                                            })
+                                    elif len(date_str) == 8:
+                                        # 格式：YYYYMMDD
+                                        formatted_date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
+                                        if start_date <= formatted_date <= end_date:
+                                            result.append({
+                                                '日期': formatted_date,
+                                                '净值': float(nav)
+                                            })
+                            except (ValueError, IndexError):
+                                continue
+
+                    if result:
+                        logger.info(f"天天基金 {code} 获取到 {len(result)} 条历史数据")
+                        return result
+
+            except json.JSONDecodeError:
+                pass
+
+            return []
+
+        except Exception as e:
+            logger.debug(f"天天基金获取 {fund_code} 数据出错: {e}")
+            return []
+
+    def get_fund_realtime_estimate(self, fund_code: str) -> Optional[Dict]:
+        """
+        获取基金实时估值（盘中估算净值）
+
+        实时估值比确认净值更及时，特别是在交易日盘中时间
+
+        Args:
+            fund_code: 基金代码
+
+        Returns:
+            包含实时估值的字典，或 None
+        """
+        try:
+            # 标准化基金代码
+            code = fund_code.zfill(6) if len(fund_code) < 6 else fund_code
+
+            # 天天基金实时估值接口
+            url = f"http://fundgz.1234567.com.cn/js/{code}.js"
+
+            response = requests.get(url, headers=self.headers, timeout=10)
+
+            if response.status_code != 200:
+                logger.debug(f"获取基金 {code} 实时估值失败: HTTP {response.status_code}")
+                return None
+
+            content = response.text.strip()
+
+            # 解析返回的 JavaScript 数据
+            # 格式: jsonpgz({"fundcode":"...", "name":"...", "gsz":"...", "gszzl":"...", "gztime":"..."})
+            import json
+            match = re.search(r'jsonpgz\((.*)\)', content)
+            if match:
+                data_str = match.group(1)
+                data = json.loads(data_str)
+
+                # 提取关键信息
+                result = {
+                    '代码': data.get('fundcode', code),
+                    '名称': data.get('name', ''),
+                    '实时估值': float(data.get('gsz', 0)),
+                    '估算涨跌幅': float(data.get('gszzl', 0)),
+                    '估算时间': data.get('gztime', ''),
+                    '数据类型': '实时估值'
+                }
+
+                logger.info(f"基金 {code} 实时估值: {result['实时估值']:.4f} ({result['估算涨跌幅']:+.2f}%) @ {result['估算时间']}")
+                return result
+
+            return None
+
+        except Exception as e:
+            logger.debug(f"获取基金 {fund_code} 实时估值出错: {e}")
+            return None
+
     def get_stock_historical_from_sina(self, stock_code: str, start_date: str, end_date: str) -> List[Dict]:
         """
         从新浪财经获取股票历史数据
@@ -651,9 +929,26 @@ class DataFetcher:
             # ETF的交易价格比净值更准确反映市场价值
             history = self.get_stock_historical_from_sina(code, start_date, end_date)
         elif code_type == '基金':
-            # 普通基金 → 东方财富基金API
+            # 普通基金 → 多数据源尝试（按优先级）
+            # 优先级1: AkShare（可能更新更快，特别是FOF基金）
+            # 优先级2: 天天基金（备用数据源）
+            # 优先级3: 东方财富基金API（当前默认）
             fetch_code = code.zfill(6) if len(code) < 6 else code
-            history = self.get_fund_historical_from_eastmoney(fetch_code, start_date, end_date)
+
+            # 尝试使用 AkShare
+            history = self.get_fund_historical_from_akshare(fetch_code, start_date, end_date)
+            if history:
+                logger.info(f"基金 {fetch_code} 使用 AkShare 获取数据成功")
+            else:
+                # 尝试使用天天基金
+                history = self.get_fund_historical_from_ttjj(fetch_code, start_date, end_date)
+                if history:
+                    logger.info(f"基金 {fetch_code} 使用天天基金获取数据成功")
+                else:
+                    # 最后尝试东方财富
+                    history = self.get_fund_historical_from_eastmoney(fetch_code, start_date, end_date)
+                    if history:
+                        logger.info(f"基金 {fetch_code} 使用东方财富获取数据成功")
         elif code_type == '股票':
             # 股票 → 优先使用东方财富股票API，失败时使用新浪财经API作为备用
             history = self.get_stock_historical_from_eastmoney(code, start_date, end_date)

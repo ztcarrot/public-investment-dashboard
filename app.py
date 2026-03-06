@@ -1009,18 +1009,41 @@ def render_config_manager():
                             with st.spinner(f"正在获取 {code} 的当前价格..."):
                                 try:
                                     fetcher = DataFetcher()
-                                    end = datetime.now().strftime('%Y-%m-%d')
-                                    start = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
 
-                                    temp_asset = {
-                                        '代码': code,
-                                        '代码类型': code_type,
-                                        '初始份额': 1.0
-                                    }
-                                    history = fetcher.fetch_asset_data(temp_asset, start, end)
-                                    if not history.empty and '净值' in history.columns:
-                                        current_price = history['净值'].iloc[-1]
-                                        st.session_state.current_price_cache[cache_key] = current_price
+                                    # 对于基金类型，优先使用实时估值
+                                    if code_type == '基金':
+                                        realtime_data = fetcher.get_fund_realtime_estimate(code)
+                                        if realtime_data and realtime_data.get('实时估值'):
+                                            current_price = realtime_data['实时估值']
+                                            st.session_state.current_price_cache[cache_key] = current_price
+                                            st.caption(f"✨ 使用实时估值（更新于 {realtime_data.get('估算时间', '未知')}）")
+                                        else:
+                                            # 实时估值不可用，回退到历史数据
+                                            end = datetime.now().strftime('%Y-%m-%d')
+                                            start = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+                                            temp_asset = {
+                                                '代码': code,
+                                                '代码类型': code_type,
+                                                '初始份额': 1.0
+                                            }
+                                            history = fetcher.fetch_asset_data(temp_asset, start, end)
+                                            if not history.empty and '净值' in history.columns:
+                                                current_price = history['净值'].iloc[-1]
+                                                st.session_state.current_price_cache[cache_key] = current_price
+                                                st.caption("⚠️ 实时估值不可用，使用最新确认净值")
+                                    else:
+                                        # 其他类型使用历史数据
+                                        end = datetime.now().strftime('%Y-%m-%d')
+                                        start = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+                                        temp_asset = {
+                                            '代码': code,
+                                            '代码类型': code_type,
+                                            '初始份额': 1.0
+                                        }
+                                        history = fetcher.fetch_asset_data(temp_asset, start, end)
+                                        if not history.empty and '净值' in history.columns:
+                                            current_price = history['净值'].iloc[-1]
+                                            st.session_state.current_price_cache[cache_key] = current_price
                                 except Exception as e:
                                     st.warning(f"⚠️ 无法获取价格: {str(e)}")
                         else:
