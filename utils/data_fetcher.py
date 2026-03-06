@@ -973,6 +973,47 @@ class DataFetcher:
             df['日期'] = pd.to_datetime(df['日期']) + timedelta(days=1)
             df['日期'] = df['日期'].dt.strftime('%Y-%m-%d')
             logger.info(f"基金 {code} 日期已增加一天")
+
+            # 尝试获取实时估值，补充最新一天的数据
+            try:
+                realtime_data = self.get_fund_realtime_estimate(code)
+                if realtime_data and realtime_data.get('实时估值'):
+                    # 从实时估值中提取日期（格式：YYYY-MM-DD HH:MM）
+                    estimate_time = realtime_data.get('估算时间', '')
+                    if estimate_time:
+                        # 提取日期部分（YYYY-MM-DD）
+                        estimate_date = estimate_time.split(' ')[0] if ' ' in estimate_time else estimate_time
+
+                        # 检查实时估值日期是否在数据范围内
+                        if start_date <= estimate_date <= end_date:
+                            # 检查是否已存在该日期的数据
+                            if estimate_date not in df['日期'].values:
+                                # 添加实时估值数据
+                                new_row = {
+                                    '日期': estimate_date,
+                                    '净值': realtime_data['实时估值'],
+                                    '持有份额': shares,
+                                    '当前市值': realtime_data['实时估值'] * shares,
+                                    '代码': code,
+                                    '名称': name,
+                                    '代码类型': code_type,
+                                    '资产类型': asset_type,
+                                    '最新价格': realtime_data['实时估值'],
+                                    '收益率': 0  # 稍后计算
+                                }
+                                df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                                df = df.sort_values('日期').reset_index(drop=True)
+                                logger.info(f"基金 {code} 已添加实时估值数据 {estimate_date}: ¥{realtime_data['实时估值']:.4f}")
+                            else:
+                                # 更新已存在的日期数据
+                                mask = df['日期'] == estimate_date
+                                df.loc[mask, '净值'] = realtime_data['实时估值']
+                                df.loc[mask, '最新价格'] = realtime_data['实时估值']
+                                df.loc[mask, '当前市值'] = realtime_data['实时估值'] * shares
+                                logger.info(f"基金 {code} 已更新实时估值数据 {estimate_date}: ¥{realtime_data['实时估值']:.4f}")
+            except Exception as e:
+                logger.debug(f"获取基金 {code} 实时估值失败: {e}")
+
         elif code == '005350' or code == '5350':
             # 兼容旧的短债基金特殊处理
             df['日期'] = pd.to_datetime(df['日期']) + timedelta(days=1)
