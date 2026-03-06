@@ -1112,32 +1112,63 @@ class DataFetcher:
 
         def fetch_single_asset(asset):
             """获取单个资产的数据（用于并发）"""
+            asset_code = asset.get('代码', 'unknown')
+            thread_name = threading.current_thread().name
+
             try:
-                logger.info(f"[线程 {threading.current_thread().name}] 正在获取 {asset['代码']}({asset['名称']}) 的数据...")
+                logger.info(f"[{thread_name}] 正在获取 {asset_code}({asset.get('名称', '')}) 的数据...")
 
                 # 为每个线程创建独立的 DataFetcher 实例，避免 session 共享问题
                 thread_fetcher = DataFetcher()
-                asset_df = thread_fetcher.fetch_asset_data(asset, start_date, end_date)
+
+                # 获取数据，捕获所有异常
+                try:
+                    asset_df = thread_fetcher.fetch_asset_data(asset, start_date, end_date)
+                except Exception as fetch_error:
+                    import traceback
+                    error_details = f"{type(fetch_error).__name__}: {str(fetch_error)}"
+                    error_trace = traceback.format_exc()
+                    logger.error(f"[{thread_name}] 获取 {asset_code} 数据失败: {error_details}\n{error_trace}")
+
+                    # 线程安全地更新进度
+                    with lock:
+                        completed_count[0] += 1
+                        if progress_callback:
+                            try:
+                                progress_callback(completed_count[0], total_assets, asset)
+                            except:
+                                pass  # 忽略回调中的错误
+                    return None
 
                 # 线程安全地更新进度
                 with lock:
                     completed_count[0] += 1
                     if progress_callback:
-                        progress_callback(completed_count[0], total_assets, asset)
+                        try:
+                            progress_callback(completed_count[0], total_assets, asset)
+                        except:
+                            pass  # 忽略回调中的错误
 
                 if not asset_df.empty:
-                    logger.info(f"  ✅ {asset['代码']} 获取 {len(asset_df)} 条数据")
+                    logger.info(f"  ✅ {asset_code} 获取 {len(asset_df)} 条数据")
                     return asset_df
                 else:
-                    logger.warning(f"  ❌ {asset['代码']} 未获取到数据")
+                    logger.warning(f"  ❌ {asset_code} 未获取到数据")
                     return None
 
             except Exception as e:
-                error_msg = f"获取 {asset.get('代码', 'unknown')} 数据时出错: {str(e)}"
-                logger.error(error_msg)
+                # 捕获所有其他异常
+                import traceback
+                error_details = f"{type(e).__name__}: {str(e)}"
+                error_trace = traceback.format_exc()
+                error_msg = f"获取 {asset_code} 数据时出错: {error_details}"
+
+                logger.error(f"[{thread_name}] {error_msg}\n{error_trace}")
+
                 with lock:
                     completed_count[0] += 1
                     errors.append(error_msg)
+
                 return None
 
         # 尝试使用并发获取
@@ -1155,22 +1186,19 @@ class DataFetcher:
                 for future in as_completed(future_to_asset):
                     asset = future_to_asset[future]
                     try:
-                        result = future.result(timeout=30)  # 添加超时
+                        result = future.result(timeout=60)  # 增加超时到60秒
                         if result is not None:
                             all_data.append(result)
                     except TimeoutError:
-                        logger.error(f"获取 {asset['代码']} 超时")
-                        with lock:
-                            completed_count[0] += 1
-                            if progress_callback:
-                                progress_callback(completed_count[0], total_assets, asset)
+                        logger.error(f"获取 {asset.get('代码', 'unknown')} 超时（60秒）")
                     except Exception as e:
-                        logger.error(f"处理 {asset['代码']} 的结果时出错: {e}")
-                        with lock:
-                            completed_count[0] += 1
+                        import traceback
+                        logger.error(f"处理 {asset.get('代码', 'unknown')} 的结果时出错: {type(e).__name__}: {str(e)}\n{traceback.format_exc()}")
 
         except Exception as e:
-            logger.error(f"并发执行出错: {e}，尝试降级到串行模式...")
+            import traceback
+            logger.error(f"并发执行出错: {type(e).__name__}: {str(e)}\n{traceback.format_exc()}")
+            logger.info("降级到串行模式...")
             # 降级到串行模式
             return self._fetch_all_assets_serial(assets, start_date, end_date, progress_callback)
 
