@@ -10,6 +10,8 @@ import re
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -1043,36 +1045,68 @@ class DataFetcher:
 
         return df[['日期', '代码', '名称', '代码类型', '资产类型', '最新价格', '持有份额', '当前市值', '收益率']]
 
-    def fetch_all_assets_data(self, assets: List[Dict], start_date: str, end_date: str, progress_callback=None) -> pd.DataFrame:
+    def fetch_all_assets_data(self, assets: List[Dict], start_date: str, end_date: str, progress_callback=None, max_workers=5) -> pd.DataFrame:
         """
-        获取所有资产的历史数据
+        获取所有资产的历史数据（并发版本）
 
         Args:
             assets: 资产配置列表
             start_date: 开始日期
             end_date: 结束日期
             progress_callback: 进度回调函数，接收当前索引和总数
+            max_workers: 最大并发线程数，默认5
 
         Returns:
             所有历史数据DataFrame
         """
         all_data = []
         total_assets = len(assets)
+        completed_count = [0]  # 使用列表以便在闭包中修改
+        lock = threading.Lock()
 
-        for idx, asset in enumerate(assets):
-            # 更新进度
-            if progress_callback:
-                progress_callback(idx, total_assets, asset)
+        def fetch_single_asset(asset):
+            """获取单个资产的数据（用于并发）"""
+            try:
+                logger.info(f"正在获取 {asset['代码']}({asset['名称']}) 的数据...")
+                asset_df = self.fetch_asset_data(asset, start_date, end_date)
 
-            logger.info(f"正在获取 {asset['代码']}({asset['名称']}) 的数据...")
+                # 线程安全地更新进度
+                with lock:
+                    completed_count[0] += 1
+                    if progress_callback:
+                        progress_callback(completed_count[0], total_assets, asset)
 
-            asset_df = self.fetch_asset_data(asset, start_date, end_date)
+                if not asset_df.empty:
+                    logger.info(f"  ✅ {asset['代码']} 获取 {len(asset_df)} 条数据")
+                    return asset_df
+                else:
+                    logger.warning(f"  ❌ {asset['代码']} 未获取到数据")
+                    return None
+            except Exception as e:
+                logger.error(f"获取 {asset['代码']} 数据时出错: {e}")
+                with lock:
+                    completed_count[0] += 1
+                return None
 
-            if not asset_df.empty:
-                logger.info(f"  ✅ {asset['代码']} 获取 {len(asset_df)} 条数据")
-                all_data.append(asset_df)
-            else:
-                logger.warning(f"  ❌ {asset['代码']} 未获取到数据")
+        # 使用线程池并发获取数据
+        logger.info(f"开始并发获取 {total_assets} 个资产的数据（并发数: {max_workers}）...")
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # 提交所有任务
+            future_to_asset = {
+                executor.submit(fetch_single_asset, asset): asset
+                for asset in assets
+            }
+
+            # 收集结果
+            for future in as_completed(future_to_asset):
+                asset = future_to_asset[future]
+                try:
+                    result = future.result()
+                    if result is not None:
+                        all_data.append(result)
+                except Exception as e:
+                    logger.error(f"处理 {asset['代码']} 的结果时出错: {e}")
 
         # 完成进度
         if progress_callback:
