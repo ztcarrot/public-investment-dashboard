@@ -1255,25 +1255,11 @@ def render_config_manager():
     st.markdown("---")
     st.subheader("🛠️ 配置操作")
 
-    # 书签保存提示
-    with st.expander("📖 保存当前配置为书签", expanded=False):
-        st.info("""
-        **💡 提示**：当前配置已自动保存在网址中！
-
-        **保存为浏览器书签的方法：**
-
-        1. **快捷键保存**（推荐）⭐
-           - **Windows/Linux**: 按 `Ctrl + D`
-           - **Mac**: 按 `Cmd + D`
-
-        2. **拖拽保存**
-           - 将浏览器地址栏的 🔗 图标拖到书签栏
-
-        3. **右键保存**
-           - 右键点击地址栏 → "将此页加入书签"
-
-        ✅ 下次打开书签即可恢复当前配置，无需重新输入！
-        """)
+    # 简洁的书签提示（使用 success 状态显示）
+    st.success("""
+    📖 **配置已自动保存在网址中！**
+    按 `Ctrl+D`（Windows/Linux）或 `Cmd+D`（Mac）保存为书签，下次打开即可恢复配置。
+    """)
 
     # 第一行：返回首页
     if st.button("🏠 返回首页", use_container_width=True):
@@ -1525,7 +1511,7 @@ def main():
         return
 
     # 数据抓取按钮
-    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+    col1, col2, col3, col_bookmark = st.columns([2, 1, 1, 0.3])
 
     with col1:
         if st.button(f"📌 当前已配置 {len(assets)} 个资产", key="goto_config"):
@@ -1560,51 +1546,27 @@ def main():
             save_to_session('investment_start_date', selected_date)  # 保存到session_state（会话内）
             st.rerun()
 
-    with col4:
-        # 书签保存功能
-        # 使用 expander 折叠面板来显示书签信息
-        with st.expander("📖 保存书签", expanded=False):
-            # 获取当前URL
-            try:
-                from streamlit.runtime.scriptrunner import get_script_run_ctx
-                ctx = get_script_run_ctx()
-                if ctx and ctx.main_script_path:
-                    import urllib.parse
-                    # 构建完整URL
-                    query_params = st.query_params
-                    params_str = '&'.join([f"{k}={urllib.parse.quote(str(v))}" for k, v in query_params.items()])
+    with col_bookmark:
+        # 简洁的书签提示按钮
+        if st.button("📖", help="保存为书签", key="bookmark_btn"):
+            st.session_state.show_bookmark_help = not st.session_state.get('show_bookmark_help', False)
+            st.rerun()
 
-                    if params_str:
-                        full_url = f"{st.get_option('browser.serverAddress')}?{params_str}"
-                    else:
-                        full_url = st.get_option('browser.serverAddress')
+    # 书签帮助提示（作为提示框显示）
+    if st.session_state.get('show_bookmark_help', False):
+        st.info("""
+        **📖 保存当前配置为书签**
 
-                    # 显示URL
-                    st.text_input(
-                        "当前配置网址",
-                        value=full_url,
-                        key="bookmark_url",
-                        help="完整网址包含了所有配置信息",
-                        disabled=True
-                    )
+        💡 **快捷键**（推荐）
+        - Windows/Linux: 按 `Ctrl + D`
+        - Mac: 按 `Cmd + D`
 
-                    st.markdown("""
-                    **📌 保存方法**
+        📌 **配置已保存在网址中，下次打开书签即可自动恢复！**
+        """)
 
-                    1. **快捷键保存**（推荐）⭐
-                       - Windows/Linux: `Ctrl + D`
-                       - Mac: `Cmd + D`
-
-                    2. **拖拽保存**
-                       - 将地址栏的 🔗 图标拖到书签栏
-
-                    3. **右键保存**
-                       - 右键点击地址栏 → "将此页加入书签"
-                    """)
-                else:
-                    st.info("💡 使用浏览器书签功能保存当前配置")
-            except:
-                st.info("💡 按 `Ctrl+D` (Windows) 或 `Cmd+D` (Mac) 保存书签")
+        if st.button("✕ 关闭", key="close_bookmark_help"):
+            st.session_state.show_bookmark_help = False
+            st.rerun()
 
     st.markdown("---")
 
