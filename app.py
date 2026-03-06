@@ -1518,8 +1518,11 @@ def main():
             # 使用 st.metric，红涨绿跌
             if st.session_state.show_numbers and total_stats['weekly_change_amount'] is not None:
                 weekly_amount = total_stats['weekly_change_amount']
-                # 传递带符号的字符串给 delta，Streamlit 会根据符号显示箭头和颜色
-                weekly_delta_display = f"¥{weekly_amount:+,.2f}"
+                # 符号放在货币符号前面，让 Streamlit 能识别正负
+                if weekly_amount >= 0:
+                    weekly_delta_display = f"+¥{weekly_amount:,.2f}"
+                else:
+                    weekly_delta_display = f"-¥{abs(weekly_amount):,.2f}"
 
                 st.metric(
                     "近一周",
@@ -1543,8 +1546,11 @@ def main():
             # 使用 st.metric，红涨绿跌
             if st.session_state.show_numbers and total_stats['monthly_change_amount'] is not None:
                 monthly_amount = total_stats['monthly_change_amount']
-                # 传递带符号的字符串给 delta，Streamlit 会根据符号显示箭头和颜色
-                monthly_delta_display = f"¥{monthly_amount:+,.2f}"
+                # 符号放在货币符号前面，让 Streamlit 能识别正负
+                if monthly_amount >= 0:
+                    monthly_delta_display = f"+¥{monthly_amount:,.2f}"
+                else:
+                    monthly_delta_display = f"-¥{abs(monthly_amount):,.2f}"
 
                 st.metric(
                     "近一月",
