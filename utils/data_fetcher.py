@@ -352,8 +352,9 @@ class DataFetcher:
         使用 akshare 获取债券历史数据
 
         根据债券类型选择不同的方法：
-        1. 可转债（代码11/12开头）：使用精确的K线数据
-        2. 其他债券：使用国债收益率曲线推算
+        1. 交易所国债（01/02/03开头）：使用 bond_zh_hs_daily 获取精确K线
+        2. 可转债（代码11/12开头）：使用 bond_zh_hs_cov_daily 获取精确K线
+        3. 其他债券：使用国债收益率曲线推算
 
         Args:
             bond_code: 债券代码（6位代码）
@@ -375,14 +376,17 @@ class DataFetcher:
 
             result = []
 
-            # 判断是否为可转债（11或12开头，6位数字）
-            # 11xxxx: 上海可转债
-            # 12xxxx: 深圳可转债
-            if len(code) == 6 and (code.startswith('11') or code.startswith('12')):
+            # 优先级1: 交易所国债（01/02/03开头）使用 bond_zh_hs_daily
+            if len(code) == 6 and code.startswith(('01', '02', '03')):
+                logger.info(f"债券 {code} 识别为交易所国债，尝试获取精确K线数据...")
+                result = self._get_exchange_treasury_data(code, start_date, end_date)
+
+            # 优先级2: 可转债（11/12开头）使用 bond_zh_hs_cov_daily
+            elif len(code) == 6 and (code.startswith('11') or code.startswith('12')):
                 logger.info(f"债券 {code} 识别为可转债，尝试获取精确K线数据...")
                 result = self._get_convertible_bond_data(code, start_date, end_date)
 
-            # 对于其他债券，使用国债收益率曲线推算
+            # 优先级3: 其他债券使用国债收益率曲线推算
             if not result:
                 logger.info(f"尝试使用国债收益率曲线推算价格...")
                 result = self._get_bond_yield_curve_data(start_date, end_date)
@@ -394,6 +398,53 @@ class DataFetcher:
 
         except Exception as e:
             logger.error(f"使用 akshare 获取债券 {bond_code} 历史数据出错: {e}")
+            return []
+
+    def _get_exchange_treasury_data(self, code: str, start_date: str, end_date: str) -> List[Dict]:
+        """
+        获取交易所国债的精确K线数据
+
+        Args:
+            code: 债券代码（6位）
+            start_date: 开始日期
+            end_date: 结束日期
+
+        Returns:
+            历史数据列表
+        """
+        try:
+            # 构造symbol：上海市场sh+代码，深圳市场sz+代码
+            # 01/02/03开头通常是上海市场国债
+            if code.startswith('01') or code.startswith('02') or code.startswith('03'):
+                symbol = f"sh{code}"
+            else:
+                # 默认使用上海市场
+                symbol = f"sh{code}"
+
+            # 获取国债日线数据
+            df = ak.bond_zh_hs_daily(symbol=symbol)
+
+            if df is not None and not df.empty:
+                # 过滤日期范围
+                df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
+                df = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
+
+                # 转换为标准格式
+                result = []
+                for _, row in df.iterrows():
+                    result.append({
+                        '日期': row['date'],
+                        '净值': float(row['close'])  # 使用收盘价
+                    })
+
+                if result:
+                    logger.info(f"akshare 交易所国债 {symbol} 获取到 {len(result)} 条精确K线数据")
+                    return result
+
+            return []
+
+        except Exception as e:
+            logger.debug(f"akshare 获取交易所国债K线数据失败: {e}")
             return []
 
     def _get_convertible_bond_data(self, code: str, start_date: str, end_date: str) -> List[Dict]:
