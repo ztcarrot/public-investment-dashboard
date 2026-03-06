@@ -1741,14 +1741,6 @@ def main():
                 st.rerun()
 
     with col2:
-        if st.button("🔄 刷新数据", type="primary", use_container_width=True):
-            # 只清除数据缓存，不清除日期选择
-            keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
-            for key in keys_to_remove:
-                del st.session_state[key]
-            st.rerun()
-
-    with col3:
         # 日期选择器
         saved_date = st.session_state.start_date
 
@@ -1773,6 +1765,15 @@ def main():
             st.session_state.start_date = selected_date
             date_config_manager.save(selected_date)  # 保存到文件（持久化）
             save_to_session('investment_start_date', selected_date)  # 保存到session_state（会话内）
+            st.rerun()
+
+    with col3:
+        # 刷新数据按钮
+        if st.button("🔄 刷新数据", type="primary", use_container_width=True):
+            # 只清除数据缓存，不清除日期选择
+            keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
+            for key in keys_to_remove:
+                del st.session_state[key]
             st.rerun()
 
     # 书签帮助提示（作为提示框显示）
