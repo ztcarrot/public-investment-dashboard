@@ -597,7 +597,7 @@ class DataFetcher:
 
         return df[['日期', '代码', '名称', '代码类型', '资产类型', '最新价格', '持有份额', '当前市值', '收益率']]
 
-    def fetch_all_assets_data(self, assets: List[Dict], start_date: str, end_date: str) -> pd.DataFrame:
+    def fetch_all_assets_data(self, assets: List[Dict], start_date: str, end_date: str, progress_callback=None) -> pd.DataFrame:
         """
         获取所有资产的历史数据
 
@@ -605,13 +605,19 @@ class DataFetcher:
             assets: 资产配置列表
             start_date: 开始日期
             end_date: 结束日期
+            progress_callback: 进度回调函数，接收当前索引和总数
 
         Returns:
             所有历史数据DataFrame
         """
         all_data = []
+        total_assets = len(assets)
 
-        for asset in assets:
+        for idx, asset in enumerate(assets):
+            # 更新进度
+            if progress_callback:
+                progress_callback(idx, total_assets, asset)
+
             logger.info(f"正在获取 {asset['代码']}({asset['名称']}) 的数据...")
 
             asset_df = self.fetch_asset_data(asset, start_date, end_date)
@@ -621,6 +627,10 @@ class DataFetcher:
                 all_data.append(asset_df)
             else:
                 logger.warning(f"  ❌ {asset['代码']} 未获取到数据")
+
+        # 完成进度
+        if progress_callback:
+            progress_callback(total_assets, total_assets, None)
 
         logger.info(f"总共获取到 {len(all_data)} 个资产的数据")
 

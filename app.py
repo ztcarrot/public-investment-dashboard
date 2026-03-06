@@ -52,6 +52,57 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+def refresh_data_with_progress(assets, start_date_str, show_success=False):
+    """
+    带进度条的数据刷新函数
+
+    Args:
+        assets: 资产配置列表
+        start_date_str: 开始日期字符串
+        show_success: 是否显示成功消息
+
+    Returns:
+        (historical_data, portfolio_data) 或 (None, None)
+    """
+    if not assets:
+        return None, None
+
+    end_date = datetime.now().strftime('%Y-%m-%d')
+
+    # 创建进度条
+    progress_bar = st.progress(0, text="🔄 正在刷新数据...")
+    status_text = st.empty()
+
+    def update_progress(current, total, asset):
+        """更新进度条"""
+        progress = (current + 1) / total
+        progress_bar.progress(progress, text=f"🔄 正在刷新数据... ({current + 1}/{total})")
+
+        if asset:
+            status_text.text(f"📊 正在获取: {asset.get('名称', '')} ({asset.get('代码', '')})")
+        else:
+            status_text.empty()
+
+    try:
+        fetcher = DataFetcher()
+        historical_data = fetcher.fetch_all_assets_data(assets, start_date_str, end_date, progress_callback=update_progress)
+    finally:
+        # 清空状态文本
+        status_text.empty()
+        progress_bar.empty()
+
+    if historical_data is None or historical_data.empty:
+        return None, None
+
+    # 生成组合数据
+    portfolio_data = fetcher.get_portfolio_summary(historical_data)
+
+    if show_success and portfolio_data is not None:
+        st.success("✅ 数据已刷新")
+
+    return historical_data, portfolio_data
+
+
 def load_data(start_date_str):
     """加载或抓取数据
 
@@ -80,8 +131,26 @@ def load_data(start_date_str):
     start_dt = datetime.strptime(start_date, '%Y-%m-%d')
     days = (datetime.now() - start_dt).days
 
-    with st.spinner(f"🔄 正在抓取最近{days}天数据..."):
-        historical_data = fetcher.fetch_all_assets_data(assets, start_date, end_date)
+    # 创建进度条
+    progress_bar = st.progress(0, text=f"🔄 正在抓取最近{days}天数据...")
+    status_text = st.empty()
+
+    def update_progress(current, total, asset):
+        """更新进度条"""
+        progress = (current + 1) / total
+        progress_bar.progress(progress, text=f"🔄 正在抓取最近{days}天数据... ({current + 1}/{total})")
+
+        if asset:
+            status_text.text(f"📊 正在获取: {asset.get('名称', '')} ({asset.get('代码', '')})")
+        else:
+            status_text.empty()
+
+    try:
+        historical_data = fetcher.fetch_all_assets_data(assets, start_date, end_date, progress_callback=update_progress)
+    finally:
+        # 清空状态文本
+        status_text.empty()
+        progress_bar.empty()
 
     if historical_data.empty:
         return None, None
@@ -1017,22 +1086,21 @@ def render_config_manager():
                         st.session_state.show_add_form = False
                         st.session_state.editing_index = None
 
-                        # 后台刷新数据（不跳转页面）
-                        with st.spinner("🔄 正在后台刷新数据..."):
-                            # 清除旧数据缓存
-                            keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
-                            for key in keys_to_remove:
-                                del st.session_state[key]
+                        # 后台刷新数据（带进度条）
+                        # 清除旧数据缓存
+                        keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
+                        for key in keys_to_remove:
+                            del st.session_state[key]
 
-                            # 重新加载数据
-                            start_date_str = st.session_state.start_date.strftime('%Y-%m-%d')
-                            historical_data, portfolio_data = load_data(start_date_str)
+                        # 重新加载数据
+                        start_date_str = st.session_state.start_date.strftime('%Y-%m-%d')
+                        historical_data, portfolio_data = refresh_data_with_progress(assets, start_date_str, show_success=False)
 
-                            if historical_data is not None and portfolio_data is not None:
-                                # 保存到session_state供配置页面使用
-                                st.session_state['historical_data'] = historical_data
-                                st.session_state['portfolio_data'] = portfolio_data
-                                st.success("✅ 数据已刷新，配置页面金额已更新")
+                        if historical_data is not None and portfolio_data is not None:
+                            # 保存到session_state供配置页面使用
+                            st.session_state['historical_data'] = historical_data
+                            st.session_state['portfolio_data'] = portfolio_data
+                            st.success("✅ 数据已刷新，配置页面金额已更新")
 
                         st.rerun()
 
@@ -1050,22 +1118,21 @@ def render_config_manager():
                     st.session_state.show_add_form = False
                     st.session_state.editing_index = None
 
-                    # 后台刷新数据（不跳转页面）
-                    with st.spinner("🔄 正在后台刷新数据..."):
-                        # 清除旧数据缓存
-                        keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
-                        for key in keys_to_remove:
-                            del st.session_state[key]
+                    # 后台刷新数据（带进度条）
+                    # 清除旧数据缓存
+                    keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
+                    for key in keys_to_remove:
+                        del st.session_state[key]
 
-                        # 重新加载数据
-                        start_date_str = st.session_state.start_date.strftime('%Y-%m-%d')
-                        historical_data, portfolio_data = load_data(start_date_str)
+                    # 重新加载数据
+                    start_date_str = st.session_state.start_date.strftime('%Y-%m-%d')
+                    historical_data, portfolio_data = refresh_data_with_progress(assets, start_date_str, show_success=False)
 
-                        if historical_data is not None and portfolio_data is not None:
-                            # 保存到session_state供配置页面使用
-                            st.session_state['historical_data'] = historical_data
-                            st.session_state['portfolio_data'] = portfolio_data
-                            st.success("✅ 数据已刷新，配置页面金额已更新")
+                    if historical_data is not None and portfolio_data is not None:
+                        # 保存到session_state供配置页面使用
+                        st.session_state['historical_data'] = historical_data
+                        st.session_state['portfolio_data'] = portfolio_data
+                        st.success("✅ 数据已刷新，配置页面金额已更新")
 
                     st.rerun()
 
@@ -1205,21 +1272,20 @@ def render_config_manager():
                         st.session_state.assets = valid_assets
                         assets_config_manager.save(valid_assets)
 
-                        # 后台刷新数据
-                        with st.spinner("🔄 正在后台刷新数据..."):
-                            # 清除旧数据缓存
-                            keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
-                            for key in keys_to_remove:
-                                del st.session_state[key]
+                        # 后台刷新数据（带进度条）
+                        # 清除旧数据缓存
+                        keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
+                        for key in keys_to_remove:
+                            del st.session_state[key]
 
-                            # 重新加载数据
-                            start_date_str = st.session_state.start_date.strftime('%Y-%m-%d')
-                            historical_data, portfolio_data = load_data(start_date_str)
+                        # 重新加载数据
+                        start_date_str = st.session_state.start_date.strftime('%Y-%m-%d')
+                        historical_data, portfolio_data = refresh_data_with_progress(valid_assets, start_date_str, show_success=False)
 
-                            if historical_data is not None and portfolio_data is not None:
-                                # 保存到session_state供配置页面使用
-                                st.session_state['historical_data'] = historical_data
-                                st.session_state['portfolio_data'] = portfolio_data
+                        if historical_data is not None and portfolio_data is not None:
+                            # 保存到session_state供配置页面使用
+                            st.session_state['historical_data'] = historical_data
+                            st.session_state['portfolio_data'] = portfolio_data
 
                         st.success(f"✅ 成功导入 {len(valid_assets)} 个资产配置")
                         st.rerun()
@@ -1243,21 +1309,20 @@ def render_config_manager():
             st.session_state.assets = assets
             assets_config_manager.save(assets)
 
-            # 后台刷新数据
-            with st.spinner("🔄 正在后台刷新数据..."):
-                # 清除旧数据缓存
-                keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
-                for key in keys_to_remove:
-                    del st.session_state[key]
+            # 后台刷新数据（带进度条）
+            # 清除旧数据缓存
+            keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
+            for key in keys_to_remove:
+                del st.session_state[key]
 
-                # 重新加载数据
-                start_date_str = st.session_state.start_date.strftime('%Y-%m-%d')
-                historical_data, portfolio_data = load_data(start_date_str)
+            # 重新加载数据
+            start_date_str = st.session_state.start_date.strftime('%Y-%m-%d')
+            historical_data, portfolio_data = refresh_data_with_progress(assets, start_date_str, show_success=False)
 
-                if historical_data is not None and portfolio_data is not None:
-                    # 保存到session_state供配置页面使用
-                    st.session_state['historical_data'] = historical_data
-                    st.session_state['portfolio_data'] = portfolio_data
+            if historical_data is not None and portfolio_data is not None:
+                # 保存到session_state供配置页面使用
+                st.session_state['historical_data'] = historical_data
+                st.session_state['portfolio_data'] = portfolio_data
 
             # 显示来源信息
             if hasattr(st, 'secrets') and 'assets' in st.secrets:
