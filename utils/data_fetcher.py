@@ -1088,7 +1088,7 @@ class DataFetcher:
 
     def fetch_all_assets_data(self, assets: List[Dict], start_date: str, end_date: str, progress_callback=None, max_workers=5) -> pd.DataFrame:
         """
-        获取所有资产的历史数据（并发版本）
+        获取所有资产的历史数据（并发版本，带降级机制）
 
         Args:
             assets: 资产配置列表
@@ -1100,16 +1100,24 @@ class DataFetcher:
         Returns:
             所有历史数据DataFrame
         """
+        if not assets:
+            logger.warning("资产列表为空")
+            return pd.DataFrame()
+
         all_data = []
         total_assets = len(assets)
         completed_count = [0]  # 使用列表以便在闭包中修改
         lock = threading.Lock()
+        errors = []
 
         def fetch_single_asset(asset):
             """获取单个资产的数据（用于并发）"""
             try:
-                logger.info(f"正在获取 {asset['代码']}({asset['名称']}) 的数据...")
-                asset_df = self.fetch_asset_data(asset, start_date, end_date)
+                logger.info(f"[线程 {threading.current_thread().name}] 正在获取 {asset['代码']}({asset['名称']}) 的数据...")
+
+                # 为每个线程创建独立的 DataFetcher 实例，避免 session 共享问题
+                thread_fetcher = DataFetcher()
+                asset_df = thread_fetcher.fetch_asset_data(asset, start_date, end_date)
 
                 # 线程安全地更新进度
                 with lock:
@@ -1123,51 +1131,122 @@ class DataFetcher:
                 else:
                     logger.warning(f"  ❌ {asset['代码']} 未获取到数据")
                     return None
+
             except Exception as e:
-                logger.error(f"获取 {asset['代码']} 数据时出错: {e}")
+                error_msg = f"获取 {asset.get('代码', 'unknown')} 数据时出错: {str(e)}"
+                logger.error(error_msg)
                 with lock:
                     completed_count[0] += 1
+                    errors.append(error_msg)
                 return None
 
-        # 使用线程池并发获取数据
+        # 尝试使用并发获取
         logger.info(f"开始并发获取 {total_assets} 个资产的数据（并发数: {max_workers}）...")
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # 提交所有任务
-            future_to_asset = {
-                executor.submit(fetch_single_asset, asset): asset
-                for asset in assets
-            }
+        try:
+            with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="AssetFetcher") as executor:
+                # 提交所有任务
+                future_to_asset = {
+                    executor.submit(fetch_single_asset, asset): asset
+                    for asset in assets
+                }
 
-            # 收集结果
-            for future in as_completed(future_to_asset):
-                asset = future_to_asset[future]
-                try:
-                    result = future.result()
-                    if result is not None:
-                        all_data.append(result)
-                except Exception as e:
-                    logger.error(f"处理 {asset['代码']} 的结果时出错: {e}")
+                # 收集结果
+                for future in as_completed(future_to_asset):
+                    asset = future_to_asset[future]
+                    try:
+                        result = future.result(timeout=30)  # 添加超时
+                        if result is not None:
+                            all_data.append(result)
+                    except TimeoutError:
+                        logger.error(f"获取 {asset['代码']} 超时")
+                        with lock:
+                            completed_count[0] += 1
+                            if progress_callback:
+                                progress_callback(completed_count[0], total_assets, asset)
+                    except Exception as e:
+                        logger.error(f"处理 {asset['代码']} 的结果时出错: {e}")
+                        with lock:
+                            completed_count[0] += 1
+
+        except Exception as e:
+            logger.error(f"并发执行出错: {e}，尝试降级到串行模式...")
+            # 降级到串行模式
+            return self._fetch_all_assets_serial(assets, start_date, end_date, progress_callback)
 
         # 完成进度
         if progress_callback:
             progress_callback(total_assets, total_assets, None)
 
-        logger.info(f"总共获取到 {len(all_data)} 个资产的数据")
+        logger.info(f"总共获取到 {len(all_data)} 个资产的数据，{len(errors)} 个失败")
+
+        if errors:
+            logger.warning(f"部分资产获取失败: {'; '.join(errors[:5])}")  # 只显示前5个错误
+
+        if all_data:
+            try:
+                result = pd.concat(all_data, ignore_index=True)
+                result = result.sort_values(['日期', '代码'])
+
+                # 检查合并后的数据
+                unique_codes = result['代码'].nunique()
+                logger.info(f"合并后共有 {unique_codes} 个不同的资产代码")
+                logger.info(f"资产代码列表: {sorted(result['代码'].unique())}")
+                logger.info(f"成功获取 {len(result)} 条历史数据")
+
+                return result
+            except Exception as e:
+                logger.error(f"合并数据时出错: {e}")
+                return pd.DataFrame()
+        else:
+            logger.warning("未获取到任何历史数据")
+            return pd.DataFrame()
+
+    def _fetch_all_assets_serial(self, assets: List[Dict], start_date: str, end_date: str, progress_callback=None) -> pd.DataFrame:
+        """
+        串行获取所有资产的历史数据（降级方案）
+
+        Args:
+            assets: 资产配置列表
+            start_date: 开始日期
+            end_date: 结束日期
+            progress_callback: 进度回调函数
+
+        Returns:
+            所有历史数据DataFrame
+        """
+        logger.info("使用串行模式获取数据...")
+        all_data = []
+        total_assets = len(assets)
+
+        for idx, asset in enumerate(assets):
+            # 更新进度
+            if progress_callback:
+                progress_callback(idx, total_assets, asset)
+
+            try:
+                logger.info(f"正在获取 {asset['代码']}({asset['名称']}) 的数据...")
+                asset_df = self.fetch_asset_data(asset, start_date, end_date)
+
+                if not asset_df.empty:
+                    logger.info(f"  ✅ {asset['代码']} 获取 {len(asset_df)} 条数据")
+                    all_data.append(asset_df)
+                else:
+                    logger.warning(f"  ❌ {asset['代码']} 未获取到数据")
+            except Exception as e:
+                logger.error(f"获取 {asset['代码']} 数据出错: {e}")
+
+        # 完成进度
+        if progress_callback:
+            progress_callback(total_assets, total_assets, None)
+
+        logger.info(f"串行模式: 总共获取到 {len(all_data)} 个资产的数据")
 
         if all_data:
             result = pd.concat(all_data, ignore_index=True)
             result = result.sort_values(['日期', '代码'])
-
-            # 检查合并后的数据
-            unique_codes = result['代码'].nunique()
-            logger.info(f"合并后共有 {unique_codes} 个不同的资产代码")
-            logger.info(f"资产代码列表: {sorted(result['代码'].unique())}")
-            logger.info(f"成功获取 {len(result)} 条历史数据")
-
             return result
         else:
-            logger.warning("未获取到任何历史数据")
             return pd.DataFrame()
 
     def get_portfolio_summary(self, historical_data: pd.DataFrame) -> pd.DataFrame:
