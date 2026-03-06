@@ -368,16 +368,50 @@ class DataFetcher:
                 data = json.loads(data_str)
 
                 # 提取关键信息
+                estimate_time = data.get('gztime', '')
+
+                # 判断数据新鲜度（使用日期判断）
+                now = datetime.now()
+                is_stale = False
+                data_status = '实时估值'
+
+                if estimate_time and ' ' in estimate_time:
+                    try:
+                        estimate_dt = datetime.strptime(estimate_time, '%Y-%m-%d %H:%M')
+                        estimate_date = estimate_dt.date()
+                        current_date = now.date()
+
+                        # 计算天数差
+                        days_diff = (current_date - estimate_date).days
+
+                        # 如果估值日期不是今天，标注为"延迟"
+                        if days_diff == 1:
+                            data_status = '昨日估值'
+                        elif days_diff >= 2:
+                            is_stale = True
+                            data_status = '过期估值'
+                        elif days_diff == 0:
+                            # 今天的数据，检查时间
+                            hours_diff = (now - estimate_dt).total_seconds() / 3600
+                            if hours_diff > 8:
+                                data_status = '今日延迟'
+                            else:
+                                data_status = '盘中实时'
+
+                    except:
+                        pass
+
                 result = {
                     '代码': data.get('fundcode', code),
                     '名称': data.get('name', ''),
                     '实时估值': float(data.get('gsz', 0)),
                     '估算涨跌幅': float(data.get('gszzl', 0)),
-                    '估算时间': data.get('gztime', ''),
-                    '数据类型': '实时估值'
+                    '估算时间': estimate_time,
+                    '数据类型': data_status,
+                    '是否过期': is_stale
                 }
 
-                logger.info(f"基金 {code} 实时估值: {result['实时估值']:.4f} ({result['估算涨跌幅']:+.2f}%) @ {result['估算时间']}")
+                logger.info(f"基金 {code} 实时估值: {result['实时估值']:.4f} ({result['估算涨跌幅']:+.2f}%) @ {result['估算时间']} [{result['数据类型']}]")
                 return result
 
             return None
@@ -1005,14 +1039,21 @@ class DataFetcher:
                                 }
                                 df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                                 df = df.sort_values('日期').reset_index(drop=True)
-                                logger.info(f"基金 {code} 已添加实时估值数据 {estimate_date}: ¥{realtime_data['实时估值']:.4f}")
+
+                                status_msg = realtime_data.get('数据类型', '实时估值')
+                                if realtime_data.get('是否过期'):
+                                    logger.warning(f"基金 {code} 已添加过期估值数据 {estimate_date}: ¥{realtime_data['实时估值']:.4f} [{status_msg}]")
+                                else:
+                                    logger.info(f"基金 {code} 已添加实时估值数据 {estimate_date}: ¥{realtime_data['实时估值']:.4f} [{status_msg}]")
                             else:
                                 # 更新已存在的日期数据
                                 mask = df['日期'] == estimate_date
                                 df.loc[mask, '净值'] = realtime_data['实时估值']
                                 df.loc[mask, '最新价格'] = realtime_data['实时估值']
                                 df.loc[mask, '当前市值'] = realtime_data['实时估值'] * shares
-                                logger.info(f"基金 {code} 已更新实时估值数据 {estimate_date}: ¥{realtime_data['实时估值']:.4f}")
+
+                                status_msg = realtime_data.get('数据类型', '实时估值')
+                                logger.info(f"基金 {code} 已更新实时估值数据 {estimate_date}: ¥{realtime_data['实时估值']:.4f} [{status_msg}]")
             except Exception as e:
                 logger.debug(f"获取基金 {code} 实时估值失败: {e}")
 
