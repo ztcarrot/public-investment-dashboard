@@ -225,6 +225,62 @@ class DataFetcher:
             logger.error(f"获取股票 {stock_code} 历史数据出错: {e}")
             return []
 
+    def get_stock_historical_from_akshare(self, stock_code: str, start_date: str, end_date: str) -> List[Dict]:
+        """
+        使用 AkShare 获取股票历史数据
+
+        当东方财富 API 返回空数据时，作为备用方案
+
+        Args:
+            stock_code: 股票代码
+            start_date: 开始日期 (YYYY-MM-DD)
+            end_date: 结束日期 (YYYY-MM-DD)
+
+        Returns:
+            历史数据列表
+        """
+        if not AKSHARE_AVAILABLE:
+            logger.warning("akshare 库不可用，无法使用 akshare 获取股票数据")
+            return []
+
+        try:
+            # 标准化股票代码
+            code = stock_code.zfill(6) if len(stock_code) < 6 else stock_code
+
+            logger.info(f"使用 AkShare 获取股票 {code} 的历史数据...")
+
+            # 转换日期格式: YYYY-MM-DD -> YYYYMMDD
+            start_date_str = start_date.replace('-', '')
+            end_date_str = end_date.replace('-', '')
+
+            # 使用 AkShare 的 stock_zh_a_hist 接口
+            df = ak.stock_zh_a_hist(
+                symbol=code,
+                period="daily",
+                start_date=start_date_str,
+                end_date=end_date_str,
+                adjust=""  # 不复权
+            )
+
+            if df is not None and not df.empty:
+                # 转换为标准格式
+                result = []
+                for _, row in df.iterrows():
+                    result.append({
+                        '日期': row['日期'],
+                        '净值': float(row['收盘'])
+                    })
+
+                if result:
+                    logger.info(f"AkShare 股票 {code} 获取到 {len(result)} 条历史数据")
+                    return result
+
+            return []
+
+        except Exception as e:
+            logger.debug(f"AkShare 获取股票 {stock_code} 数据失败: {e}")
+            return []
+
     def get_bond_19789_historical(self, start_date: str, end_date: str) -> List[Dict]:
         """
         获取25特国06(19789)的历史数据
@@ -599,8 +655,11 @@ class DataFetcher:
             fetch_code = code.zfill(6) if len(code) < 6 else code
             history = self.get_fund_historical_from_eastmoney(fetch_code, start_date, end_date)
         elif code_type == '股票':
-            # 股票 → 东方财富股票API
+            # 股票 → 优先使用东方财富股票API，失败时使用新浪财经API作为备用
             history = self.get_stock_historical_from_eastmoney(code, start_date, end_date)
+            if not history:
+                logger.info(f"股票 {code} 东方财富 API 无数据，尝试使用新浪财经API...")
+                history = self.get_stock_historical_from_sina(code, start_date, end_date)
         else:
             # 默认使用东方财富基金API
             fetch_code = code.zfill(6) if len(code) < 6 else code
