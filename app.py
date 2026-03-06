@@ -1752,13 +1752,21 @@ def main():
         # 日期选择器
         saved_date = st.session_state.start_date
 
-        # 日期选择器
-        selected_date = st.date_input(
-            "开始日期",
-            value=saved_date,
-            max_value=datetime.now().date(),
-            key="start_date_input"
-        )
+        # 日期选择器 - 使用列布局让标签和输入框在一行
+        col_date_label, col_date_input = st.columns([1, 2])
+
+        with col_date_label:
+            st.markdown("开始日期")
+            st.markdown("<br>", unsafe_allow_html=True)  # 添加换行对齐
+
+        with col_date_input:
+            selected_date = st.date_input(
+                "",
+                value=saved_date,
+                max_value=datetime.now().date(),
+                key="start_date_input",
+                label_visibility="collapsed"
+            )
 
         # 如果用户改变了日期，保存到文件和session_state
         if selected_date != saved_date:
