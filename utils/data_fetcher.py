@@ -420,6 +420,92 @@ class DataFetcher:
             logger.debug(f"获取基金 {fund_code} 实时估值出错: {e}")
             return None
 
+    def get_fund_estimate_history(self, fund_code: str, days: int = 3) -> List[Dict]:
+        """
+        获取基金最近几天的估算历史（用于填补确认净值延迟的空缺）
+
+        通过天天基金的单位净值走势接口获取最近的数据，
+        这些数据包含最新的确认净值和可能的估算值
+
+        Args:
+            fund_code: 基金代码
+            days: 获取最近几天的数据，默认3天
+
+        Returns:
+            估算历史列表，每项包含日期和估值
+        """
+        try:
+            code = fund_code.zfill(6) if len(fund_code) < 6 else fund_code
+
+            # 东方财富基金数据接口（包含最近的历史数据）
+            url = f"http://fund.eastmoney.com/pingzhongdata/{code}.js"
+
+            response = requests.get(url, headers=self.headers, timeout=15)
+
+            if response.status_code != 200:
+                logger.debug(f"获取基金 {code} 估算历史失败: HTTP {response.status_code}")
+                return []
+
+            content = response.text
+
+            # 提取单位净值数据（NetWorthTrend）
+            result = []
+
+            # 优先使用单位净值走势
+            patterns = [
+                r'NetWorthTrend.*?\[\[(.*?)\]\]',  # 单位净值
+                r'Data_netWorthTrend.*?\[\[(.*?)\]\]',  # 累计净值（备用）
+            ]
+
+            for pattern in patterns:
+                match = re.search(pattern, content, re.DOTALL)
+                if match:
+                    data_str = match.group(1)
+                    points = data_str.split('],[')
+
+                    # 从最新的数据开始取，取指定天数
+                    recent_points = points[-days:] if len(points) >= days else points
+
+                    for point in recent_points:
+                        try:
+                            point = point.replace('"', '').replace('[', '').replace(']', '')
+                            values = point.split(',')
+
+                            if len(values) >= 2:
+                                timestamp = values[0].strip()
+                                nav = values[1].strip()
+
+                                if nav and float(nav) > 0:
+                                    try:
+                                        # 时间戳可能是毫秒级
+                                        if len(timestamp) > 10:
+                                            timestamp = timestamp[:10]
+
+                                        date_obj = datetime.fromtimestamp(int(timestamp))
+                                        date_str = date_obj.strftime('%Y-%m-%d')
+
+                                        result.append({
+                                            '日期': date_str,
+                                            '估值': float(nav)
+                                        })
+                                    except:
+                                        continue
+
+                        except Exception:
+                            continue
+
+                    if result:
+                        # 按日期排序
+                        result.sort(key=lambda x: x['日期'])
+                        logger.info(f"基金 {code} 获取到 {len(result)} 条估算历史数据（最近{days}天）")
+                        return result
+
+            return []
+
+        except Exception as e:
+            logger.debug(f"获取基金 {fund_code} 估算历史出错: {e}")
+            return []
+
     def get_stock_historical_from_sina(self, stock_code: str, start_date: str, end_date: str) -> List[Dict]:
         """
         从新浪财经获取股票历史数据
@@ -1010,7 +1096,54 @@ class DataFetcher:
             df['日期'] = df['日期'].dt.strftime('%Y-%m-%d')
             logger.info(f"基金 {code} 日期已增加一天")
 
-            # 尝试获取实时估值，补充最新一天的数据
+            # 尝试获取最近3天的估算历史，填补确认净值延迟的空缺
+            try:
+                estimate_history = self.get_fund_estimate_history(code, days=3)
+
+                if estimate_history:
+                    # 将估算数据合并到历史数据中
+                    for estimate_data in estimate_history:
+                        estimate_date = estimate_data['日期']
+                        estimate_value = estimate_data['估值']
+
+                        # 检查该日期是否在数据范围内
+                        if start_date <= estimate_date <= end_date:
+                            # 检查是否已存在该日期的数据
+                            if estimate_date not in df['日期'].values:
+                                # 添加估算数据
+                                new_row = {
+                                    '日期': estimate_date,
+                                    '净值': estimate_value,
+                                    '持有份额': shares,
+                                    '当前市值': estimate_value * shares,
+                                    '代码': code,
+                                    '名称': name,
+                                    '代码类型': code_type,
+                                    '资产类型': asset_type,
+                                    '最新价格': estimate_value,
+                                    '收益率': 0  # 稍后计算
+                                }
+                                df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                                logger.info(f"基金 {code} 添加估算数据 {estimate_date}: ¥{estimate_value:.4f}")
+                            else:
+                                # 如果该日期已存在，检查是否需要更新（估算值可能比确认净值更新）
+                                existing_row = df[df['日期'] == estimate_date].iloc[0]
+                                # 如果现有数据较旧（天数差超过1天），用估算值更新
+                                existing_date = pd.to_datetime(existing_row['日期'])
+                                estimate_dt = pd.to_datetime(estimate_date)
+                                if (estimate_dt - existing_date).days > 1:
+                                    df.loc[df['日期'] == estimate_date, '净值'] = estimate_value
+                                    df.loc[df['日期'] == estimate_date, '最新价格'] = estimate_value
+                                    df.loc[df['日期'] == estimate_date, '当前市值'] = estimate_value * shares
+                                    logger.info(f"基金 {code} 更新估算数据 {estimate_date}: ¥{estimate_value:.4f}")
+
+                    # 重新排序
+                    df = df.sort_values('日期').reset_index(drop=True)
+
+            except Exception as e:
+                logger.debug(f"获取基金 {code} 估算历史失败: {e}")
+
+            # 再尝试获取最新的实时估值，确保有今天的数据
             try:
                 realtime_data = self.get_fund_realtime_estimate(code)
                 if realtime_data and realtime_data.get('实时估值'):
@@ -1041,21 +1174,18 @@ class DataFetcher:
                                 df = df.sort_values('日期').reset_index(drop=True)
 
                                 status_msg = realtime_data.get('数据类型', '实时估值')
-                                if realtime_data.get('是否过期'):
-                                    logger.warning(f"基金 {code} 已添加过期估值数据 {estimate_date}: ¥{realtime_data['实时估值']:.4f} [{status_msg}]")
-                                else:
-                                    logger.info(f"基金 {code} 已添加实时估值数据 {estimate_date}: ¥{realtime_data['实时估值']:.4f} [{status_msg}]")
+                                logger.info(f"基金 {code} 添加最新估值 {estimate_date}: ¥{realtime_data['实时估值']:.4f} [{status_msg}]")
                             else:
-                                # 更新已存在的日期数据
+                                # 更新已存在的日期数据（用最新的实时估值）
                                 mask = df['日期'] == estimate_date
                                 df.loc[mask, '净值'] = realtime_data['实时估值']
                                 df.loc[mask, '最新价格'] = realtime_data['实时估值']
                                 df.loc[mask, '当前市值'] = realtime_data['实时估值'] * shares
 
                                 status_msg = realtime_data.get('数据类型', '实时估值')
-                                logger.info(f"基金 {code} 已更新实时估值数据 {estimate_date}: ¥{realtime_data['实时估值']:.4f} [{status_msg}]")
+                                logger.info(f"基金 {code} 更新最新估值 {estimate_date}: ¥{realtime_data['实时估值']:.4f} [{status_msg}]")
             except Exception as e:
-                logger.debug(f"获取基金 {code} 实时估值失败: {e}")
+                logger.debug(f"获取基金 {code} 最新实时估值失败: {e}")
 
         elif code == '005350' or code == '5350':
             # 兼容旧的短债基金特殊处理
