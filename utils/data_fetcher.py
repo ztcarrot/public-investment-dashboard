@@ -530,26 +530,15 @@ class DataFetcher:
             shares = 0.0
 
         # 获取历史数据
-        # 特殊处理19789（25特国06）：也尝试使用 akshare
+        # 特殊处理19789（25特国06）：使用 akshare
         if code == '19789' or code == '019789':
-            # 优先尝试 akshare
-            logger.info(f"特殊国债 {code} 尝试使用 akshare 获取数据...")
+            # 使用 akshare 获取数据
+            logger.info(f"特殊国债 {code} 使用 akshare 获取数据...")
             history = self.get_bond_historical_from_akshare(code, start_date, end_date)
-
-            # 如果 akshare 失败，使用原有的专用方法
-            if not history:
-                logger.warning(f"akshare 获取 {code} 数据失败，使用原有的专用方法")
-                history = self.get_bond_19789_historical(start_date, end_date)
         elif code_type == '债券':
-            # 债券类型：优先使用 akshare，失败后使用东方财富基金API
-            logger.info(f"债券 {code} 尝试使用 akshare 获取数据...")
+            # 债券类型：使用 akshare 获取数据
+            logger.info(f"债券 {code} 使用 akshare 获取数据...")
             history = self.get_bond_historical_from_akshare(code, start_date, end_date)
-
-            # 如果 akshare 获取失败，使用东方财富基金API作为备用
-            if not history:
-                logger.warning(f"akshare 获取债券 {code} 数据失败，使用东方财富基金API作为备用")
-                fetch_code = code.zfill(6) if len(code) < 6 else code
-                history = self.get_fund_historical_from_eastmoney(fetch_code, start_date, end_date)
         elif code_type == '场内ETF':
             # 所有场内ETF统一使用新浪API获取交易价格
             # ETF的交易价格比净值更准确反映市场价值
