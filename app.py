@@ -75,7 +75,8 @@ def refresh_data_with_progress(assets, start_date_str, show_success=False):
 
     def update_progress(current, total, asset):
         """更新进度条"""
-        progress = (current + 1) / total
+        # 确保进度值在 [0.0, 1.0] 范围内
+        progress = min((current + 1) / total, 1.0)
         progress_bar.progress(progress, text=f"🔄 正在刷新数据... ({current + 1}/{total})")
 
         if asset:
@@ -137,7 +138,8 @@ def load_data(start_date_str):
 
     def update_progress(current, total, asset):
         """更新进度条"""
-        progress = (current + 1) / total
+        # 确保进度值在 [0.0, 1.0] 范围内
+        progress = min((current + 1) / total, 1.0)
         progress_bar.progress(progress, text=f"🔄 正在抓取最近{days}天数据... ({current + 1}/{total})")
 
         if asset:
