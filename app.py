@@ -1722,16 +1722,26 @@ def main():
         return
 
     # 数据抓取按钮
-    col1, col2, col3, col_bookmark = st.columns([2, 1, 1, 0.3])
+    col1, col2, col3 = st.columns([2, 1, 1])
 
     with col1:
-        if st.button(f"📌 当前已配置 {len(assets)} 个资产", key="goto_config"):
-            st.session_state.current_page = 'config'
-            st.session_state.page_selection = 1
-            st.rerun()
+        # 第一行：主按钮 + 书签按钮
+        col_btn, col_bookmark = st.columns([5, 1])
+
+        with col_btn:
+            if st.button(f"📌 当前已配置 {len(assets)} 个资产", key="goto_config", use_container_width=True):
+                st.session_state.current_page = 'config'
+                st.session_state.page_selection = 1
+                st.rerun()
+
+        with col_bookmark:
+            # 书签图标按钮（放在主按钮右边）
+            if st.button("📖", help="保存为书签", key="bookmark_btn"):
+                st.session_state.show_bookmark_help = not st.session_state.get('show_bookmark_help', False)
+                st.rerun()
 
     with col2:
-        if st.button("🔄 刷新数据", type="primary"):
+        if st.button("🔄 刷新数据", type="primary", use_container_width=True):
             # 只清除数据缓存，不清除日期选择
             keys_to_remove = [k for k in st.session_state.keys() if k.startswith('data_cache_')]
             for key in keys_to_remove:
@@ -1755,12 +1765,6 @@ def main():
             st.session_state.start_date = selected_date
             date_config_manager.save(selected_date)  # 保存到文件（持久化）
             save_to_session('investment_start_date', selected_date)  # 保存到session_state（会话内）
-            st.rerun()
-
-    with col_bookmark:
-        # 简洁的书签提示按钮
-        if st.button("📖", help="保存为书签", key="bookmark_btn"):
-            st.session_state.show_bookmark_help = not st.session_state.get('show_bookmark_help', False)
             st.rerun()
 
     # 书签帮助提示（作为提示框显示）
