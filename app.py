@@ -819,71 +819,220 @@ def render_asset_performance(historical_data):
 
             st.markdown("---")
 
-            # 按标的分组绘制折线图
-            fig = go.Figure()
+            # 【股票类特殊处理】添加单独的走势图
+            if asset_type == '股票' and num_assets > 1:
+                # 先显示汇总对比图
+                st.markdown("#### 📊 所有股票对比图")
 
-            # 为每个标的设置不同颜色
-            colors = [color, '#95E1D3', '#F38181', '#AA96DA', '#FCBAD3', '#FFFFD2']
+                # 按标的分组绘制折线图
+                fig = go.Figure()
 
-            for idx, asset_name in enumerate(asset_names):
-                asset_subset = asset_data[asset_data['名称'] == asset_name].copy()
+                # 为每个标的设置不同颜色
+                colors = [color, '#95E1D3', '#F38181', '#AA96DA', '#FCBAD3', '#FFFFD2']
 
-                # 归一化：第一天设为100
-                first_value = asset_subset['当前市值'].iloc[0]
-                if first_value > 0:
-                    asset_subset['归一化值'] = (asset_subset['当前市值'] / first_value) * 100
-                else:
-                    asset_subset['归一化值'] = 100
+                for idx, asset_name in enumerate(asset_names):
+                    asset_subset = asset_data[asset_data['名称'] == asset_name].copy()
 
-                # 保存原始值用于 hover 显示
-                asset_subset['原始市值'] = asset_subset['当前市值']
+                    # 归一化：第一天设为100
+                    first_value = asset_subset['当前市值'].iloc[0]
+                    if first_value > 0:
+                        asset_subset['归一化值'] = (asset_subset['当前市值'] / first_value) * 100
+                    else:
+                        asset_subset['归一化值'] = 100
 
-                # 计算收益率
-                if len(asset_subset) > 1:
-                    start_value = asset_subset['当前市值'].iloc[0]
-                    end_value = asset_subset['当前市值'].iloc[-1]
-                    change_pct = ((end_value - start_value) / start_value * 100)
-                    change_emoji = "📈" if change_pct >= 0 else "📉"
-                    name_display = f"{asset_name} ({change_emoji} {change_pct:+.2f}%)"
-                else:
-                    name_display = asset_name
+                    # 保存原始值用于 hover 显示
+                    asset_subset['原始市值'] = asset_subset['当前市值']
 
-                fig.add_trace(go.Scatter(
-                    x=asset_subset['日期'],
-                    y=asset_subset['归一化值'],
-                    mode='lines+markers',
-                    name=name_display,
-                    line=dict(width=2.5, color=colors[idx % len(colors)]),
-                    marker=dict(size=5),
-                    hovertemplate='%{x}<br>%{fullData.name}<br>归一化: %{y:.2f}<br>实际: ¥%{customdata[0]:,.2f}<extra></extra>',
-                    customdata=asset_subset[['原始市值']].values
-                ))
+                    # 计算收益率
+                    if len(asset_subset) > 1:
+                        start_value = asset_subset['当前市值'].iloc[0]
+                        end_value = asset_subset['当前市值'].iloc[-1]
+                        change_pct = ((end_value - start_value) / start_value * 100)
+                        change_emoji = "📈" if change_pct >= 0 else "📉"
+                        name_display = f"{asset_name} ({change_emoji} {change_pct:+.2f}%)"
+                    else:
+                        name_display = asset_name
 
-            fig.update_layout(
-                title=dict(
-                    text=f"{asset_type}类标的走势对比（归一化，起点=100）",
-                    font=dict(size=16, color='#333')
-                ),
-                xaxis_title="日期",
-                yaxis_title="相对值（起点=100）",
-                hovermode='x unified',
-                template='plotly_white',
-                height=450,
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="right",
-                    x=1,
-                    font=dict(size=11)
-                ),
-                margin=dict(l=0, r=0, t=50, b=0),
-                plot_bgcolor='rgba(248,248,248,0.8)',
-                xaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(0,0,0,0.1)'),
-                yaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(0,0,0,0.1)')
-            )
+                    fig.add_trace(go.Scatter(
+                        x=asset_subset['日期'],
+                        y=asset_subset['归一化值'],
+                        mode='lines+markers',
+                        name=name_display,
+                        line=dict(width=2.5, color=colors[idx % len(colors)]),
+                        marker=dict(size=5),
+                        hovertemplate='%{x}<br>%{fullData.name}<br>归一化: %{y:.2f}<br>实际: ¥%{customdata[0]:,.2f}<extra></extra>',
+                        customdata=asset_subset[['原始市值']].values
+                    ))
 
-            st.plotly_chart(fig, use_container_width=True)
+                fig.update_layout(
+                    title=dict(
+                        text=f"{asset_type}类标的走势对比（归一化，起点=100）",
+                        font=dict(size=14, color='#333')
+                    ),
+                    xaxis_title="日期",
+                    yaxis_title="相对值（起点=100）",
+                    hovermode='x unified',
+                    template='plotly_white',
+                    height=400,
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1,
+                        font=dict(size=10)
+                    ),
+                    margin=dict(l=0, r=0, t=40, b=0),
+                    plot_bgcolor='rgba(248,248,248,0.8)',
+                    xaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(0,0,0,0.1)'),
+                    yaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(0,0,0,0.1)')
+                )
+
+                st.plotly_chart(fig, use_container_width=True)
+
+                # 分割线
+                st.markdown("---")
+                st.markdown("#### 🔍 个股详细走势")
+
+                # 为每个股票创建独立的折叠面板
+                for idx, asset_name in enumerate(asset_names):
+                    asset_subset = asset_data[asset_data['名称'] == asset_name].copy()
+
+                    # 计算该股票的统计信息
+                    if len(asset_subset) > 1:
+                        start_value = asset_subset['当前市值'].iloc[0]
+                        end_value = asset_subset['当前市值'].iloc[-1]
+                        change_pct = ((end_value - start_value) / start_value * 100)
+                        change_emoji = "📈" if change_pct >= 0 else "📉"
+                    else:
+                        change_pct = 0
+                        change_emoji = "➡️"
+
+                    # 获取股票代码
+                    asset_code = asset_subset['代码'].iloc[0] if '代码' in asset_subset.columns else ''
+
+                    # 创建子折叠面板
+                    with st.expander(f"{change_emoji} {asset_name} ({asset_code}) - {change_pct:+.2f}%", expanded=False, key=f"stock_{idx}"):
+                        # 显示该股票的详细信息
+                        col_a, col_b, col_c = st.columns(3)
+                        with col_a:
+                            st.metric("起始市值", f"¥{start_value:,.2f}")
+                        with col_b:
+                            st.metric("最新市值", f"¥{end_value:,.2f}")
+                        with col_c:
+                            st.metric("涨跌幅", f"{change_pct:+.2f}%")
+
+                        # 绘制单独的走势图
+                        fig_single = go.Figure()
+
+                        # 归一化：第一天设为100
+                        first_value = asset_subset['当前市值'].iloc[0]
+                        if first_value > 0:
+                            asset_subset['归一化值'] = (asset_subset['当前市值'] / first_value) * 100
+                        else:
+                            asset_subset['归一化值'] = 100
+
+                        # 保存原始值
+                        asset_subset['原始市值'] = asset_subset['当前市值']
+
+                        # 添加主图（归一化）
+                        fig_single.add_trace(go.Scatter(
+                            x=asset_subset['日期'],
+                            y=asset_subset['归一化值'],
+                            mode='lines+markers',
+                            name='归一化走势',
+                            line=dict(width=3, color=color),
+                            marker=dict(size=6),
+                            hovertemplate='%{x}<br>归一化: %{y:.2f}<br>实际: ¥%{customdata[0]:,.2f}<extra></extra>',
+                            customdata=asset_subset[['原始市值']].values
+                        ))
+
+                        fig_single.update_layout(
+                            title=dict(
+                                text=f"{asset_name} 走势详情（归一化，起点=100）",
+                                font=dict(size=14, color='#333')
+                            ),
+                            xaxis_title="日期",
+                            yaxis_title="相对值（起点=100）",
+                            template='plotly_white',
+                            height=350,
+                            hovermode='x unified',
+                            margin=dict(l=0, r=0, t=40, b=0),
+                            plot_bgcolor='rgba(248,248,248,0.8)',
+                            xaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(0,0,0,0.1)'),
+                            yaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(0,0,0,0.1)'),
+                            showlegend=False
+                        )
+
+                        st.plotly_chart(fig_single, use_container_width=True)
+
+            else:
+                # 其他资产类型（黄金、现金、国债）保持原样，显示汇总对比图
+                # 按标的分组绘制折线图
+                fig = go.Figure()
+
+                # 为每个标的设置不同颜色
+                colors = [color, '#95E1D3', '#F38181', '#AA96DA', '#FCBAD3', '#FFFFD2']
+
+                for idx, asset_name in enumerate(asset_names):
+                    asset_subset = asset_data[asset_data['名称'] == asset_name].copy()
+
+                    # 归一化：第一天设为100
+                    first_value = asset_subset['当前市值'].iloc[0]
+                    if first_value > 0:
+                        asset_subset['归一化值'] = (asset_subset['当前市值'] / first_value) * 100
+                    else:
+                        asset_subset['归一化值'] = 100
+
+                    # 保存原始值用于 hover 显示
+                    asset_subset['原始市值'] = asset_subset['当前市值']
+
+                    # 计算收益率
+                    if len(asset_subset) > 1:
+                        start_value = asset_subset['当前市值'].iloc[0]
+                        end_value = asset_subset['当前市值'].iloc[-1]
+                        change_pct = ((end_value - start_value) / start_value * 100)
+                        change_emoji = "📈" if change_pct >= 0 else "📉"
+                        name_display = f"{asset_name} ({change_emoji} {change_pct:+.2f}%)"
+                    else:
+                        name_display = asset_name
+
+                    fig.add_trace(go.Scatter(
+                        x=asset_subset['日期'],
+                        y=asset_subset['归一化值'],
+                        mode='lines+markers',
+                        name=name_display,
+                        line=dict(width=2.5, color=colors[idx % len(colors)]),
+                        marker=dict(size=5),
+                        hovertemplate='%{x}<br>%{fullData.name}<br>归一化: %{y:.2f}<br>实际: ¥%{customdata[0]:,.2f}<extra></extra>',
+                        customdata=asset_subset[['原始市值']].values
+                    ))
+
+                fig.update_layout(
+                    title=dict(
+                        text=f"{asset_type}类标的走势对比（归一化，起点=100）",
+                        font=dict(size=16, color='#333')
+                    ),
+                    xaxis_title="日期",
+                    yaxis_title="相对值（起点=100）",
+                    hovermode='x unified',
+                    template='plotly_white',
+                    height=450,
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1,
+                        font=dict(size=11)
+                    ),
+                    margin=dict(l=0, r=0, t=50, b=0),
+                    plot_bgcolor='rgba(248,248,248,0.8)',
+                    xaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(0,0,0,0.1)'),
+                    yaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(0,0,0,0.1)')
+                )
+
+                st.plotly_chart(fig, use_container_width=True)
 
     st.caption("💡 归一化说明：所有标的起点设为100，便于比较相对走势。点击折叠标题展开/收起详情。")
 
