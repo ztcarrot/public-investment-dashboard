@@ -1645,25 +1645,45 @@ def main():
 
         # 初始化页面选择
         if 'page_selection' not in st.session_state:
-            st.session_state.page_selection = 0 if st.session_state.get('current_page') == 'dashboard' else 1
+            current_page = st.session_state.get('current_page', 'dashboard')
+            if current_page == 'dashboard':
+                st.session_state.page_selection = 0
+            elif current_page == 'fund_screener':
+                st.session_state.page_selection = 1
+            else:  # config
+                st.session_state.page_selection = 2
 
         # 根据current_page更新索引（防止按钮跳转后radio不更新）
-        if st.session_state.get('current_page') == 'dashboard' and st.session_state.page_selection != 0:
+        current_page = st.session_state.get('current_page')
+        if current_page == 'dashboard' and st.session_state.page_selection != 0:
             st.session_state.page_selection = 0
-        elif st.session_state.get('current_page') == 'config' and st.session_state.page_selection != 1:
+        elif current_page == 'fund_screener' and st.session_state.page_selection != 1:
             st.session_state.page_selection = 1
+        elif current_page == 'config' and st.session_state.page_selection != 2:
+            st.session_state.page_selection = 2
 
         page = st.radio(
             "选择页面",
-            options=["📊 数据看板", "⚙️ 配置管理"],
+            options=["📊 数据看板", "🔍 基金筛选", "⚙️ 配置管理"],
             index=st.session_state.page_selection
         )
 
         # 更新状态
-        st.session_state.page_selection = 0 if page == "📊 数据看板" else 1
-        st.session_state.current_page = 'dashboard' if page == "📊 数据看板" else 'config'
+        if page == "📊 数据看板":
+            st.session_state.page_selection = 0
+            st.session_state.current_page = 'dashboard'
+        elif page == "🔍 基金筛选":
+            st.session_state.page_selection = 1
+            st.session_state.current_page = 'fund_screener'
+        else:  # ⚙️ 配置管理
+            st.session_state.page_selection = 2
+            st.session_state.current_page = 'config'
 
     # 根据选择的页面显示不同内容
+    if st.session_state.current_page == 'fund_screener':
+        render_fund_screener()
+        return
+
     if st.session_state.current_page == 'config':
         render_config_manager()
         return
