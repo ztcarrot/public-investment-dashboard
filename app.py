@@ -1517,25 +1517,16 @@ def main():
         if total_stats['weekly_change'] is not None:
             # 使用 st.metric，红涨绿跌
             if st.session_state.show_numbers and total_stats['weekly_change_amount'] is not None:
-                # 使用自定义格式化的 delta（带货币符号），同时保持箭头和颜色正确
                 weekly_amount = total_stats['weekly_change_amount']
-                weekly_delta_str = f"{'↑' if weekly_amount > 0 else '↓' if weekly_amount < 0 else '→'} ¥{abs(weekly_amount):,.2f}"
-                weekly_delta_color = "#ff4b4b" if weekly_amount > 0 else "#26c281" if weekly_amount < 0 else "#666"
+                # 传递带符号的字符串给 delta，Streamlit 会根据符号显示箭头和颜色
+                weekly_delta_display = f"¥{weekly_amount:+,.2f}"
 
-                col = st.container()
-                col.markdown(
-                    f"""
-                    <div style="background-color: white; padding: 16px; border-radius: 8px; border: 1px solid #f0f0f0; margin: 8px 0;">
-                        <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                            <div style="font-size: 14px; color: #666; margin-bottom: 8px; font-weight: 400;">近一周</div>
-                            <div style="font-size: 28px; font-weight: 600; color: #1f1f1f; line-height: 1.2;">{total_stats['weekly_change']:+.2f}%</div>
-                            <div style="font-size: 18px; color: {weekly_delta_color}; font-weight: 500; margin-top: 8px; display: flex; align-items: center;">
-                                {weekly_delta_str}
-                            </div>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
+                st.metric(
+                    "近一周",
+                    f"{total_stats['weekly_change']:+.2f}%",
+                    delta=weekly_delta_display,
+                    delta_color="inverse",
+                    help="相比7天前的涨跌幅"
                 )
             else:
                 # 隐藏模式：不显示 delta
@@ -1551,25 +1542,16 @@ def main():
         if total_stats['monthly_change'] is not None:
             # 使用 st.metric，红涨绿跌
             if st.session_state.show_numbers and total_stats['monthly_change_amount'] is not None:
-                # 使用自定义格式化的 delta（带货币符号），同时保持箭头和颜色正确
                 monthly_amount = total_stats['monthly_change_amount']
-                monthly_delta_str = f"{'↑' if monthly_amount > 0 else '↓' if monthly_amount < 0 else '→'} ¥{abs(monthly_amount):,.2f}"
-                monthly_delta_color = "#ff4b4b" if monthly_amount > 0 else "#26c281" if monthly_amount < 0 else "#666"
+                # 传递带符号的字符串给 delta，Streamlit 会根据符号显示箭头和颜色
+                monthly_delta_display = f"¥{monthly_amount:+,.2f}"
 
-                col = st.container()
-                col.markdown(
-                    f"""
-                    <div style="background-color: white; padding: 16px; border-radius: 8px; border: 1px solid #f0f0f0; margin: 8px 0;">
-                        <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                            <div style="font-size: 14px; color: #666; margin-bottom: 8px; font-weight: 400;">近一月</div>
-                            <div style="font-size: 28px; font-weight: 600; color: #1f1f1f; line-height: 1.2;">{total_stats['monthly_change']:+.2f}%</div>
-                            <div style="font-size: 18px; color: {monthly_delta_color}; font-weight: 500; margin-top: 8px; display: flex; align-items: center;">
-                                {monthly_delta_str}
-                            </div>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
+                st.metric(
+                    "近一月",
+                    f"{total_stats['monthly_change']:+.2f}%",
+                    delta=monthly_delta_display,
+                    delta_color="inverse",
+                    help="相比30天前的涨跌幅"
                 )
             else:
                 # 隐藏模式：不显示 delta
