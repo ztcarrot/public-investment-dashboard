@@ -54,3 +54,7 @@ temp/
 *.bak
 data/date_config.json
 data/user_assets.json
+
+# 缓存文件
+cache/*.json
+!cache/.gitkeep

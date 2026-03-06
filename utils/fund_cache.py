@@ -9,7 +9,7 @@
 import json
 import os
 from datetime import datetime, timedelta
-from typing import Optional, Dict, List
+from typing import Optional, Dict
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 
 class FundCacheManager:
     """基金数据缓存管理器"""
+
+    DATE_FORMAT = '%Y-%m-%d'
+    DEFAULT_EXPIRE_DAYS = 7
 
     def __init__(self, cache_file: str = "cache/fund_screening.json"):
         """
@@ -75,11 +78,12 @@ class FundCacheManager:
             是否保存成功
         """
         try:
-            # 添加更新时间戳
-            data['update_time'] = datetime.now().strftime('%Y-%m-%d')
+            # 创建副本，避免修改原始数据
+            cache_data = data.copy()
+            cache_data['update_time'] = datetime.now().strftime(self.DATE_FORMAT)
 
             with open(self.cache_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+                json.dump(cache_data, f, ensure_ascii=False, indent=2)
 
             logger.info(f"缓存已保存: {self.cache_file}")
             return True
@@ -88,16 +92,18 @@ class FundCacheManager:
             logger.error(f"保存缓存失败: {e}")
             return False
 
-    def is_expired(self, days: int = 7) -> bool:
+    def is_expired(self, days: Optional[int] = None) -> bool:
         """
         检查缓存是否过期
 
         Args:
-            days: 过期天数阈值，默认7天
+            days: 过期天数阈值，默认使用 DEFAULT_EXPIRE_DAYS
 
         Returns:
             是否过期
         """
+        if days is None:
+            days = self.DEFAULT_EXPIRE_DAYS
         data = self.load()
         if not data:
             return True
@@ -107,7 +113,7 @@ class FundCacheManager:
             if not update_time_str:
                 return True
 
-            update_time = datetime.strptime(update_time_str, '%Y-%m-%d')
+            update_time = datetime.strptime(update_time_str, self.DATE_FORMAT)
             expire_time = datetime.now() - timedelta(days=days)
 
             is_expired = update_time < expire_time
@@ -140,7 +146,7 @@ class FundCacheManager:
             if not update_time_str:
                 return -1
 
-            update_time = datetime.strptime(update_time_str, '%Y-%m-%d')
+            update_time = datetime.strptime(update_time_str, self.DATE_FORMAT)
             age = (datetime.now() - update_time).days
             return age
 
