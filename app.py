@@ -1647,6 +1647,10 @@ def main():
         if 'page_selection' not in st.session_state:
             st.session_state.page_selection = 0 if st.session_state.get('current_page') == 'dashboard' else 1
 
+        # 初始化 dashboard 子页面选择
+        if 'dashboard_tab' not in st.session_state:
+            st.session_state.dashboard_tab = 0
+
         def update_page_selection():
             """radio 选择变化的回调函数"""
             page = st.session_state.page_selection_radio
@@ -1660,6 +1664,30 @@ def main():
             on_change=update_page_selection,
             key="page_selection_radio"
         )
+
+        # 如果选择了数据看板，显示二级菜单
+        if st.session_state.current_page == 'dashboard':
+            st.markdown("---")
+            st.caption("📑 数据看板页面")
+
+            def update_dashboard_tab():
+                """二级菜单选择变化的回调函数"""
+                tab = st.session_state.dashboard_tab_radio
+                tab_map = {
+                    "📊 总资产概览": 0,
+                    "🥧 资产配置": 1,
+                    "📊 标的表现": 2,
+                    "📋 数据表格": 3
+                }
+                st.session_state.dashboard_tab = tab_map.get(tab, 0)
+
+            dashboard_tab = st.radio(
+                "选择视图",
+                options=["📊 总资产概览", "🥧 资产配置", "📊 标的表现", "📋 数据表格"],
+                index=st.session_state.dashboard_tab,
+                on_change=update_dashboard_tab,
+                key="dashboard_tab_radio"
+            )
 
     # 根据选择的页面显示不同内容
     if st.session_state.current_page == 'config':
@@ -1823,10 +1851,10 @@ def main():
             st.query_params['show'] = '1' if st.session_state.show_numbers else '0'
             st.rerun()
 
-    # 图表
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 总资产概览", "🥧 资产配置", "📊 标的表现", "📋 数据表格"])
+    # 根据侧边栏二级菜单显示对应内容
+    current_tab = st.session_state.dashboard_tab
 
-    with tab1:
+    if current_tab == 0:
         # 总资产概览
         st.markdown("### 💰 总资产概览")
 
@@ -2052,13 +2080,16 @@ def main():
         # 总资产走势图
         render_total_assets_chart(portfolio_data)
 
-    with tab2:
+    elif current_tab == 1:
+        # 资产配置
         render_allocation_chart(portfolio_data)
 
-    with tab3:
+    elif current_tab == 2:
+        # 标的表现
         render_asset_performance(historical_data)
 
-    with tab4:
+    elif current_tab == 3:
+        # 数据表格
         render_data_table(historical_data, portfolio_data)
 
 
