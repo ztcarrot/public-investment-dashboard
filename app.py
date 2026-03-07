@@ -1835,28 +1835,28 @@ def main():
     # 获取最新数据
     latest = portfolio_data.iloc[-1]
 
-    # 金额显示切换按钮（放在顶部）
-    col_header, col_toggle = st.columns([4, 1])
-    with col_header:
-        st.markdown("")  # 占位
-    with col_toggle:
-        if st.session_state.show_numbers:
-            button_label = "👁️ 隐藏金额"
-        else:
-            button_label = "🙈 显示金额"
-        if st.button(button_label, key="toggle_numbers"):
-            # 切换状态并更新 URL
-            st.session_state.show_numbers = not st.session_state.show_numbers
-            # 更新 URL 参数
-            st.query_params['show'] = '1' if st.session_state.show_numbers else '0'
-            st.rerun()
-
     # 根据侧边栏二级菜单显示对应内容
     current_tab = st.session_state.dashboard_tab
 
     if current_tab == 0:
         # 总资产概览
-        st.markdown("### 💰 总资产概览")
+
+        # 金额显示切换按钮（只在总资产概览页面显示）
+        col_header, col_toggle = st.columns([4, 1])
+        with col_header:
+            st.markdown("### 💰 总资产概览")
+        with col_toggle:
+            st.markdown("<br>", unsafe_allow_html=True)  # 对齐
+            if st.session_state.show_numbers:
+                button_label = "👁️ 隐藏金额"
+            else:
+                button_label = "🙈 显示金额"
+            if st.button(button_label, key="toggle_numbers"):
+                # 切换状态并更新 URL
+                st.session_state.show_numbers = not st.session_state.show_numbers
+                # 更新 URL 参数
+                st.query_params['show'] = '1' if st.session_state.show_numbers else '0'
+                st.rerun()
 
         # 计算总资产的涨幅
         total_stats = calculate_change_percentages(portfolio_data, '总资产')
