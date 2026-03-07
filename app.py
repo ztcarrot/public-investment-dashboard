@@ -1078,18 +1078,18 @@ def render_data_table(historical_data, portfolio_data):
     )
 
 
-def render_fund_screener():
-    """渲染基金筛选页面"""
-    st.title("🔍 短债基金筛选（快速原型版）")
+def render_fund_performance():
+    """渲染基金表现分析页面"""
+    st.title("📊 我的基金表现分析")
 
-    from utils.fund_screener_simple import screen_funds_simple, get_sample_funds
+    from utils.fund_performance import analyze_user_funds
     from utils.fund_cache import fund_cache_manager
 
     # 顶部说明
     st.info("""
-    💡 **快速原型版**：当前版本分析预定义的知名短债基金 + 你配置文件中的短债基金。
+    💡 **基金表现分析**：从你的资产配置中读取所有基金，分析不同时间段的收益率和夏普比率。
 
-    分析指标：近1年收益率、近3年收益率、最大回撤、夏普比率
+    分析时间段：近1年、近3年、近5年、近10年、成立至今
     """)
 
     st.markdown("---")
@@ -1127,17 +1127,18 @@ def render_fund_screener():
 
     if has_data:
         # 使用缓存数据
-        screened_funds = cache_data.get('screened_funds', [])
+        funds = cache_data.get('funds', [])
         total_funds = cache_data.get('total_funds', 0)
+        analyzed_funds = cache_data.get('analyzed_funds', 0)
 
-        st.success(f"✅ 使用缓存数据：共筛选出 {len(screened_funds)} 只基金（从 {total_funds} 只短债基金中）")
+        st.success(f"✅ 使用缓存数据：成功分析 {analyzed_funds} 只基金（共 {total_funds} 只）")
 
-        # 展示筛选结果
-        _display_fund_results(screened_funds)
+        # 展示分析结果
+        _display_fund_performance(funds)
 
     else:
         # 重新获取数据
-        st.info("🔄 正在从 akshare 获取最新数据...")
+        st.info("🔄 正在分析你的基金表现...")
 
         # 创建进度条
         progress_bar = st.progress(0, text="正在获取基金数据...")
@@ -1147,7 +1148,7 @@ def render_fund_screener():
             """更新进度"""
             if total > 0:
                 progress = min((current + 1) / total, 1.0)
-                progress_bar.progress(progress, text=f"正在获取基金数据... ({current + 1}/{total})")
+                progress_bar.progress(progress, text=f"正在分析基金... ({current + 1}/{total})")
 
             if fund_info:
                 status_text.text(f"📊 正在处理: {fund_info.get('名称', '')} ({fund_info.get('代码', '')})")
@@ -1155,8 +1156,8 @@ def render_fund_screener():
                 status_text.empty()
 
         try:
-            # 执行筛选（使用简化版，快速获取10个基金）
-            result = screen_funds_simple(progress_callback=update_progress)
+            # 执行分析
+            result = analyze_user_funds(progress_callback=update_progress)
 
             if result:
                 # 保存到缓存
@@ -1167,34 +1168,35 @@ def render_fund_screener():
                 status_text.empty()
 
                 # 展示结果
-                screened_funds = result.get('screened_funds', [])
+                funds = result.get('funds', [])
                 total_funds = result.get('total_funds', 0)
+                analyzed_funds = result.get('analyzed_funds', 0)
 
-                st.success(f"✅ 筛选完成：共找到 {len(screened_funds)} 只优质基金（从 {total_funds} 只短债基金中）")
+                st.success(f"✅ 分析完成：成功分析 {analyzed_funds} 只基金（共 {total_funds} 只）")
 
-                # 展示筛选结果
-                _display_fund_results(screened_funds)
+                # 展示分析结果
+                _display_fund_performance(funds)
             else:
                 progress_bar.empty()
                 status_text.empty()
-                st.error("❌ 获取基金数据失败，请稍后重试")
+                st.error("❌ 分析失败，请检查配置文件中的基金是否正确")
 
         except Exception as e:
             progress_bar.empty()
             status_text.empty()
-            logger.error(f"基金筛选失败: {e}")
+            logger.error(f"基金分析失败: {e}")
             st.error(f"❌ 发生错误: {str(e)}")
 
 
-def _display_fund_results(funds: list):
+def _display_fund_performance(funds: list):
     """
-    展示基金筛选结果
+    展示基金表现分析结果
 
     Args:
         funds: 基金列表
     """
     if not funds:
-        st.warning("⚠️ 没有找到符合条件的基金")
+        st.warning("⚠️ 没有找到基金数据")
         return
 
     # 转换为 DataFrame
@@ -1203,58 +1205,96 @@ def _display_fund_results(funds: list):
     # 格式化显示
     display_df = df.copy()
 
-    # 格式化百分比列
-    # 近1年收益率
-    if '近1年收益率' in display_df.columns:
-        display_df['近1年收益率'] = display_df['近1年收益率'].apply(
-            lambda x: f"{x:+.2f}%" if pd.notna(x) else "N/A"
-        )
+    # 格式化收益率列
+    for period in ['近1年', '近3年', '近5年', '近10年', '成立至今']:
+        col = f'{period}收益率'
+        if col in display_df.columns:
+            display_df[col] = display_df[col].apply(
+                lambda x: f"{x:+.2f}%" if pd.notna(x) and x != 0 else "0.00%"
+            )
 
-    # 近3年收益率
-    if '近3年收益率' in display_df.columns:
-        display_df['近3年收益率'] = display_df['近3年收益率'].apply(
-            lambda x: f"{x:+.2f}%" if pd.notna(x) else "N/A"
-        )
-
-    # 最大回撤
+    # 格式化最大回撤
     if '最大回撤' in display_df.columns:
         display_df['最大回撤'] = display_df['最大回撤'].apply(
             lambda x: f"{x:.2f}%" if pd.notna(x) else "N/A"
         )
 
-    # 夏普比率
-    if '夏普比率' in display_df.columns:
-        display_df['夏普比率'] = display_df['夏普比率'].apply(
-            lambda x: f"{x:.2f}" if pd.notna(x) else "N/A"
-        )
+    # 格式化夏普比率
+    for period in ['1年', '3年', '5年']:
+        col = f'夏普比率{period}'
+        if col in display_df.columns:
+            display_df[col] = display_df[col].apply(
+                lambda x: f"{x:.2f}" if pd.notna(x) else "N/A"
+            )
 
-    # 选择要显示的列（简化版）
-    display_cols = ['基金代码', '基金名称', '近1年收益率', '近3年收益率', '最大回撤', '夏普比率']
+    # 选择要显示的列
+    display_cols = ['基金代码', '基金名称', '近1年收益率', '近3年收益率', '近5年收益率', '近10年收益率', '成立至今收益率', '最大回撤', '夏普比率1年', '夏普比率3年', '夏普比率5年']
 
     # 只显示存在的列
     display_cols = [col for col in display_cols if col in display_df.columns]
 
-    st.markdown("### 📊 基金表现分析")
+    st.markdown("### 📊 基金表现详情")
     st.dataframe(
         display_df[display_cols],
         use_container_width=True,
         hide_index=True
     )
 
-    # 添加操作说明
-    with st.expander("💡 如何添加到投资组合？"):
-        st.markdown("""
-        1. 记下感兴趣的基金代码（如 `005350`）
-        2. 点击左侧导航进入 **⚙️ 配置管理**
-        3. 点击 **➕ 添加资产**
-        4. 填写基金信息：
-           - **代码**: 基金代码
-           - **名称**: 基金名称
-           - **代码类型**: 债券
-           - **资产类别**: 现金
-           - **初始份额**: 购买的份额数量
-        5. 点击保存
-        """)
+    # 统计信息
+    with st.expander("📈 统计摘要"):
+        # 收益率统计（按时间段）
+        periods = ['近1年', '近3年', '近5年', '近10年', '成立至今']
+
+        for period in periods:
+            col_name = f'{period}收益率'
+            if col_name in df.columns:
+                # 过滤掉 0 值（数据不足的情况）
+                valid_returns = df[df[col_name] != 0][col_name]
+
+                if len(valid_returns) > 0:
+                    avg_return = valid_returns.mean()
+                    max_return = valid_returns.max()
+                    min_return = valid_returns.min()
+
+                    st.markdown(f"**{period}收益率**")
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("平均", f"{avg_return:+.2f}%")
+                    col2.metric("最高", f"{max_return:+.2f}%")
+                    col3.metric("最低", f"{min_return:+.2f}%")
+                    st.markdown("---")
+
+        # 最大回撤统计
+        if '最大回撤' in df.columns:
+            avg_drawdown = df['最大回撤'].mean()
+            max_drawdown = df['最大回撤'].min()  # 最小值 = 最大回撤
+            min_drawdown = df['最大回撤'].max()  # 最大值 = 最小回撤
+
+            st.markdown("**最大回撤**")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("平均", f"{avg_drawdown:.2f}%")
+            col2.metric("最差（最大）", f"{max_drawdown:.2f}%")
+            col3.metric("最好（最小）", f"{min_drawdown:.2f}%")
+            st.markdown("---")
+
+        # 夏普比率统计
+        sharpe_periods = ['1年', '3年', '5年']
+        for period in sharpe_periods:
+            col_name = f'夏普比率{period}'
+            if col_name in df.columns:
+                # 过滤掉 0 值
+                valid_sharpe = df[df[col_name] != 0][col_name]
+
+                if len(valid_sharpe) > 0:
+                    avg_sharpe = valid_sharpe.mean()
+                    max_sharpe = valid_sharpe.max()
+                    min_sharpe = valid_sharpe.min()
+
+                    st.markdown(f"**夏普比率（{period}）**")
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("平均", f"{avg_sharpe:.2f}")
+                    col2.metric("最高", f"{max_sharpe:.2f}")
+                    col3.metric("最低", f"{min_sharpe:.2f}")
+                    st.markdown("---")
 
     # 统计信息
     with st.expander("📈 统计信息"):
@@ -1876,7 +1916,7 @@ def main():
             current_page = st.session_state.get('current_page', 'dashboard')
             if current_page == 'dashboard':
                 st.session_state.page_selection = 0
-            elif current_page == 'fund_screener':
+            elif current_page == 'fund_performance':
                 st.session_state.page_selection = 1
             else:  # config
                 st.session_state.page_selection = 2
@@ -1885,14 +1925,14 @@ def main():
         current_page = st.session_state.get('current_page')
         if current_page == 'dashboard' and st.session_state.page_selection != 0:
             st.session_state.page_selection = 0
-        elif current_page == 'fund_screener' and st.session_state.page_selection != 1:
+        elif current_page == 'fund_performance' and st.session_state.page_selection != 1:
             st.session_state.page_selection = 1
         elif current_page == 'config' and st.session_state.page_selection != 2:
             st.session_state.page_selection = 2
 
         page = st.radio(
             "选择页面",
-            options=["📊 数据看板", "🔍 基金筛选", "⚙️ 配置管理"],
+            options=["📊 数据看板", "📈 基金表现", "⚙️ 配置管理"],
             index=st.session_state.page_selection
         )
 
@@ -1900,16 +1940,16 @@ def main():
         if page == "📊 数据看板":
             st.session_state.page_selection = 0
             st.session_state.current_page = 'dashboard'
-        elif page == "🔍 基金筛选":
+        elif page == "📈 基金表现":
             st.session_state.page_selection = 1
-            st.session_state.current_page = 'fund_screener'
+            st.session_state.current_page = 'fund_performance'
         else:  # ⚙️ 配置管理
             st.session_state.page_selection = 2
             st.session_state.current_page = 'config'
 
     # 根据选择的页面显示不同内容
-    if st.session_state.current_page == 'fund_screener':
-        render_fund_screener()
+    if st.session_state.current_page == 'fund_performance':
+        render_fund_performance()
         return
 
     if st.session_state.current_page == 'config':
