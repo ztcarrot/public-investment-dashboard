@@ -1807,11 +1807,10 @@ def main():
     # 获取最新数据
     latest = portfolio_data.iloc[-1]
 
-    # 第一行：总资产信息（标题 + 按钮）
-    col_header, col_toggle = st.columns([3, 2])
+    # 金额显示切换按钮（放在顶部）
+    col_header, col_toggle = st.columns([4, 1])
     with col_header:
-        st.markdown("### 💰 总资产概览")
-
+        st.markdown("")  # 占位
     with col_toggle:
         if st.session_state.show_numbers:
             button_label = "👁️ 隐藏金额"
@@ -1824,229 +1823,233 @@ def main():
             st.query_params['show'] = '1' if st.session_state.show_numbers else '0'
             st.rerun()
 
-    # 计算总资产的涨幅
-    total_stats = calculate_change_percentages(portfolio_data, '总资产')
+    # 图表
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 总资产概览", "🥧 资产配置", "📊 标的表现", "📋 数据表格"])
 
-    # 总资产统计卡片
-    col_total1, col_total2, col_total3 = st.columns(3)
+    with tab1:
+        # 总资产概览
+        st.markdown("### 💰 总资产概览")
 
-    with col_total1:
-        # 根据show_numbers状态决定是否显示金额
-        if st.session_state.show_numbers:
-            # 构建delta字符串：百分比 + 金额
-            delta_text = None
-            if total_stats['daily_change'] is not None:
-                amount_str = f"¥{total_stats['daily_change_amount']:,.2f}" if total_stats['daily_change_amount'] is not None else ""
-                delta_text = f"{total_stats['daily_change']:+.2f}% ({amount_str})"
+        # 计算总资产的涨幅
+        total_stats = calculate_change_percentages(portfolio_data, '总资产')
 
-            st.metric(
-                "当前总金额",
-                f"¥{latest['总资产']:,.2f}",
-                delta=delta_text,
-                delta_color="inverse",
-                help="相比前一天的涨跌幅"
-            )
-        else:
-            # 隐藏金额，使用markdown显示
-            st.markdown("### 当前总金额")
-            st.markdown("###### \*\*\*\*\*\*")
-            if total_stats['daily_change'] is not None:
-                st.markdown(f"*日涨跌: {total_stats['daily_change']:+.2f}%*")
+        # 总资产统计卡片
+        col_total1, col_total2, col_total3 = st.columns(3)
 
-    with col_total2:
-        if total_stats['weekly_change'] is not None:
-            # 使用 st.metric，红涨绿跌
-            if st.session_state.show_numbers and total_stats['weekly_change_amount'] is not None:
-                weekly_amount = total_stats['weekly_change_amount']
-                # 符号放在货币符号前面，让 Streamlit 能识别正负
-                if weekly_amount >= 0:
-                    weekly_delta_display = f"+¥{weekly_amount:,.2f}"
-                else:
-                    weekly_delta_display = f"-¥{abs(weekly_amount):,.2f}"
-
-                st.metric(
-                    "近一周",
-                    f"{total_stats['weekly_change']:+.2f}%",
-                    delta=weekly_delta_display,
-                    delta_color="inverse",
-                    help="相比7天前的涨跌幅"
-                )
-            else:
-                # 隐藏模式：不显示 delta
-                st.metric(
-                    "近一周",
-                    f"{total_stats['weekly_change']:+.2f}%",
-                    help="相比7天前的涨跌幅"
-                )
-        else:
-            st.metric("近一周", "暂无数据")
-
-    with col_total3:
-        if total_stats['monthly_change'] is not None:
-            # 使用 st.metric，红涨绿跌
-            if st.session_state.show_numbers and total_stats['monthly_change_amount'] is not None:
-                monthly_amount = total_stats['monthly_change_amount']
-                # 符号放在货币符号前面，让 Streamlit 能识别正负
-                if monthly_amount >= 0:
-                    monthly_delta_display = f"+¥{monthly_amount:,.2f}"
-                else:
-                    monthly_delta_display = f"-¥{abs(monthly_amount):,.2f}"
-
-                st.metric(
-                    "近一月",
-                    f"{total_stats['monthly_change']:+.2f}%",
-                    delta=monthly_delta_display,
-                    delta_color="inverse",
-                    help="相比30天前的涨跌幅"
-                )
-            else:
-                # 隐藏模式：不显示 delta
-                st.metric(
-                    "近一月",
-                    f"{total_stats['monthly_change']:+.2f}%",
-                    help="相比30天前的涨跌幅"
-                )
-        else:
-            st.metric("近一月", "暂无数据")
-
-    st.markdown("---")
-
-    # 第二行：各资产类型详情
-    st.markdown("### 📊 资产类型详情")
-
-    asset_types = [
-        {'name': '股票', 'icon': '📈', 'color': '#1f77b4'},
-        {'name': '黄金', 'icon': '🏅', 'color': '#ff7f0e'},
-        {'name': '现金', 'icon': '💵', 'color': '#2ca02c'},
-        {'name': '国债', 'icon': '📜', 'color': '#d62728'}
-    ]
-
-    cols = st.columns(4)
-    for idx, asset_info in enumerate(asset_types):
-        asset_name = asset_info['name']
-        with cols[idx]:
-            # 计算该资产类型的涨幅
-            asset_stats = calculate_change_percentages(portfolio_data, asset_name)
-
-            # 显示金额和占比
-            amount = latest[asset_name]
-            percentage = latest[f'{asset_name}占比']
-
-            st.markdown(f"#### {asset_info['icon']} {asset_name}")
-
-            # 金额（根据show_numbers状态决定是否显示）
+        with col_total1:
+            # 根据show_numbers状态决定是否显示金额
             if st.session_state.show_numbers:
                 # 构建delta字符串：百分比 + 金额
                 delta_text = None
-                if asset_stats and asset_stats['daily_change'] is not None:
-                    amount_str = f"¥{asset_stats['daily_change_amount']:,.2f}" if asset_stats.get('daily_change_amount') is not None else ""
-                    delta_text = f"{asset_stats['daily_change']:+.2f}% ({amount_str})"
+                if total_stats['daily_change'] is not None:
+                    amount_str = f"¥{total_stats['daily_change_amount']:,.2f}" if total_stats['daily_change_amount'] is not None else ""
+                    delta_text = f"{total_stats['daily_change']:+.2f}% ({amount_str})"
 
                 st.metric(
-                    "总金额",
-                    f"¥{amount:,.2f}",
+                    "当前总金额",
+                    f"¥{latest['总资产']:,.2f}",
                     delta=delta_text,
-                    delta_color="inverse"
+                    delta_color="inverse",
+                    help="相比前一天的涨跌幅"
                 )
             else:
-                # 隐藏金额显示
-                st.markdown("**总金额:** \*\*\*\*\*\*")
-                if asset_stats and asset_stats['daily_change'] is not None:
-                    st.caption(f"日涨跌: {asset_stats['daily_change']:+.2f}%")
+                # 隐藏金额，使用markdown显示
+                st.markdown("### 当前总金额")
+                st.markdown("###### \*\*\*\*\*\*")
+                if total_stats['daily_change'] is not None:
+                    st.markdown(f"*日涨跌: {total_stats['daily_change']:+.2f}%*")
 
-            # 占比（始终显示）
-            is_imbalanced = percentage < 15 or percentage > 35
+        with col_total2:
+            if total_stats['weekly_change'] is not None:
+                # 使用 st.metric，红涨绿跌
+                if st.session_state.show_numbers and total_stats['weekly_change_amount'] is not None:
+                    weekly_amount = total_stats['weekly_change_amount']
+                    # 符号放在货币符号前面，让 Streamlit 能识别正负
+                    if weekly_amount >= 0:
+                        weekly_delta_display = f"+¥{weekly_amount:,.2f}"
+                    else:
+                        weekly_delta_display = f"-¥{abs(weekly_amount):,.2f}"
 
-            if is_imbalanced:
-                # 警告框
-                st.markdown(
-                    f"""
-                    <div style="background-color: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 12px; margin-top: 10px;">
-                        <div style="font-size: 0.9em; font-weight: bold; color: #856404;">占比</div>
-                        <div style="font-size: 1.5em; font-weight: bold; color: #d97706;">{percentage:.2f}%</div>
-                        <div style="font-size: 0.8em; color: #dc3545; font-weight: bold; margin-top: 4px;">⚠️ 不平衡</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-                # 帮助说明（使用带help的空metric）
-                st.metric(
-                    "",
-                    "",
-                    help="永久投资组合理想配置：四大核心资产各占25%，实现风险分散和长期稳定增值\n\n当前配置：低于15%配置过低影响收益，高于35%增加集中风险\n\n建议：调整至25%左右的平衡状态"
-                )
+                    st.metric(
+                        "近一周",
+                        f"{total_stats['weekly_change']:+.2f}%",
+                        delta=weekly_delta_display,
+                        delta_color="inverse",
+                        help="相比7天前的涨跌幅"
+                    )
+                else:
+                    # 隐藏模式：不显示 delta
+                    st.metric(
+                        "近一周",
+                        f"{total_stats['weekly_change']:+.2f}%",
+                        help="相比7天前的涨跌幅"
+                    )
             else:
-                st.metric(
-                    "占比",
-                    f"{percentage:.2f}%"
-                )
+                st.metric("近一周", "暂无数据")
 
-    st.markdown("---")
+        with col_total3:
+            if total_stats['monthly_change'] is not None:
+                # 使用 st.metric，红涨绿跌
+                if st.session_state.show_numbers and total_stats['monthly_change_amount'] is not None:
+                    monthly_amount = total_stats['monthly_change_amount']
+                    # 符号放在货币符号前面，让 Streamlit 能识别正负
+                    if monthly_amount >= 0:
+                        monthly_delta_display = f"+¥{monthly_amount:,.2f}"
+                    else:
+                        monthly_delta_display = f"-¥{abs(monthly_amount):,.2f}"
 
-    # 第三行：统一的涨幅详情折叠面板
-    with st.expander("📊 各资产类型涨幅详情", expanded=False):
-        st.caption("显示各资产类型在不同时间段内的涨跌幅")
+                    st.metric(
+                        "近一月",
+                        f"{total_stats['monthly_change']:+.2f}%",
+                        delta=monthly_delta_display,
+                        delta_color="inverse",
+                        help="相比30天前的涨跌幅"
+                    )
+                else:
+                    # 隐藏模式：不显示 delta
+                    st.metric(
+                        "近一月",
+                        f"{total_stats['monthly_change']:+.2f}%",
+                        help="相比30天前的涨跌幅"
+                    )
+            else:
+                st.metric("近一月", "暂无数据")
 
-        # 使用4列显示，增加列间距
-        detail_cols = st.columns(4, gap="large")
+        st.markdown("---")
+
+        # 资产类型详情
+        st.markdown("### 📊 资产类型详情")
+
+        asset_types = [
+            {'name': '股票', 'icon': '📈', 'color': '#1f77b4'},
+            {'name': '黄金', 'icon': '🏅', 'color': '#ff7f0e'},
+            {'name': '现金', 'icon': '💵', 'color': '#2ca02c'},
+            {'name': '国债', 'icon': '📜', 'color': '#d62728'}
+        ]
+
+        cols = st.columns(4)
         for idx, asset_info in enumerate(asset_types):
             asset_name = asset_info['name']
-            asset_stats = calculate_change_percentages(portfolio_data, asset_name)
+            with cols[idx]:
+                # 计算该资产类型的涨幅
+                asset_stats = calculate_change_percentages(portfolio_data, asset_name)
 
-            with detail_cols[idx]:
+                # 显示金额和占比
+                amount = latest[asset_name]
+                percentage = latest[f'{asset_name}占比']
+
                 st.markdown(f"#### {asset_info['icon']} {asset_name}")
 
-                if asset_stats:
-                    # 涨跌幅详情折叠面板：根据 show_numbers 显示金额或百分比
-                    # 红色代表涨，绿色代表跌
+                # 金额（根据show_numbers状态决定是否显示）
+                if st.session_state.show_numbers:
+                    # 构建delta字符串：百分比 + 金额
+                    delta_text = None
+                    if asset_stats and asset_stats['daily_change'] is not None:
+                        amount_str = f"¥{asset_stats['daily_change_amount']:,.2f}" if asset_stats.get('daily_change_amount') is not None else ""
+                        delta_text = f"{asset_stats['daily_change']:+.2f}% ({amount_str})"
 
-                    def format_change(value, label, amount_key=None):
-                        """格式化涨跌幅显示，红色涨绿色跌"""
-                        if value is None:
-                            return None
+                    st.metric(
+                        "总金额",
+                        f"¥{amount:,.2f}",
+                        delta=delta_text,
+                        delta_color="inverse"
+                    )
+                else:
+                    # 隐藏金额显示
+                    st.markdown("**总金额:** \*\*\*\*\*\*")
+                    if asset_stats and asset_stats['daily_change'] is not None:
+                        st.caption(f"日涨跌: {asset_stats['daily_change']:+.2f}%")
 
-                        # 根据设置显示金额或百分比
-                        if st.session_state.show_numbers and amount_key is not None:
-                            amount = asset_stats.get(amount_key)
-                            if amount is not None:
-                                display_value = f"¥{amount:,.2f}"
-                                # 基于金额判断颜色和箭头
-                                change_value = amount
+                # 占比（始终显示）
+                is_imbalanced = percentage < 15 or percentage > 35
+
+                if is_imbalanced:
+                    # 警告框
+                    st.markdown(
+                        f"""
+                        <div style="background-color: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 12px; margin-top: 10px;">
+                            <div style="font-size: 0.9em; font-weight: bold; color: #856404;">占比</div>
+                            <div style="font-size: 1.5em; font-weight: bold; color: #d97706;">{percentage:.2f}%</div>
+                            <div style="font-size: 0.8em; color: #dc3545; font-weight: bold; margin-top: 4px;">⚠️ 不平衡</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                    # 帮助说明（使用带help的空metric）
+                    st.metric(
+                        "",
+                        "",
+                        help="永久投资组合理想配置：四大核心资产各占25%，实现风险分散和长期稳定增值\n\n当前配置：低于15%配置过低影响收益，高于35%增加集中风险\n\n建议：调整至25%左右的平衡状态"
+                    )
+                else:
+                    st.metric(
+                        "占比",
+                        f"{percentage:.2f}%"
+                    )
+
+        st.markdown("---")
+
+        # 各资产类型涨幅详情
+        with st.expander("📊 各资产类型涨幅详情", expanded=False):
+            st.caption("显示各资产类型在不同时间段内的涨跌幅")
+
+            # 使用4列显示，增加列间距
+            detail_cols = st.columns(4, gap="large")
+            for idx, asset_info in enumerate(asset_types):
+                asset_name = asset_info['name']
+                asset_stats = calculate_change_percentages(portfolio_data, asset_name)
+
+                with detail_cols[idx]:
+                    st.markdown(f"#### {asset_info['icon']} {asset_name}")
+
+                    if asset_stats:
+                        # 涨跌幅详情折叠面板：根据 show_numbers 显示金额或百分比
+                        # 红色代表涨，绿色代表跌
+
+                        def format_change(value, label, amount_key=None):
+                            """格式化涨跌幅显示，红色涨绿色跌"""
+                            if value is None:
+                                return None
+
+                            # 根据设置显示金额或百分比
+                            if st.session_state.show_numbers and amount_key is not None:
+                                amount = asset_stats.get(amount_key)
+                                if amount is not None:
+                                    display_value = f"¥{amount:,.2f}"
+                                    # 基于金额判断颜色和箭头
+                                    change_value = amount
+                                else:
+                                    display_value = f"{abs(value):.2f}%"
+                                    change_value = value
                             else:
                                 display_value = f"{abs(value):.2f}%"
                                 change_value = value
-                        else:
-                            display_value = f"{abs(value):.2f}%"
-                            change_value = value
 
-                        # 根据实际变化的值判断颜色和箭头
-                        color = "#ff4b4b" if change_value > 0 else "#26c281"  # 红涨绿跌
-                        icon = "↑" if change_value > 0 else "↓" if change_value < 0 else "→"
+                            # 根据实际变化的值判断颜色和箭头
+                            color = "#ff4b4b" if change_value > 0 else "#26c281"  # 红涨绿跌
+                            icon = "↑" if change_value > 0 else "↓" if change_value < 0 else "→"
 
-                        st.markdown(
-                            f"""
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin: 8px 0;">
-                                <span style="color: #666;">{label}</span>
-                                <span style="color: {color}; font-weight: bold; font-size: 1.1em;">
-                                    {icon} {display_value}
-                                </span>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
+                            st.markdown(
+                                f"""
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin: 8px 0;">
+                                    <span style="color: #666;">{label}</span>
+                                    <span style="color: {color}; font-weight: bold; font-size: 1.1em;">
+                                        {icon} {display_value}
+                                    </span>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
 
-                    format_change(asset_stats['daily_change'], "日涨幅", "daily_change_amount")
-                    format_change(asset_stats['weekly_change'], "近一周", "weekly_change_amount")
-                    format_change(asset_stats['monthly_change'], "近一月", "monthly_change_amount")
-                    format_change(asset_stats['total_change'], "累计涨幅", "total_change_amount")
+                        format_change(asset_stats['daily_change'], "日涨幅", "daily_change_amount")
+                        format_change(asset_stats['weekly_change'], "近一周", "weekly_change_amount")
+                        format_change(asset_stats['monthly_change'], "近一月", "monthly_change_amount")
+                        format_change(asset_stats['total_change'], "累计涨幅", "total_change_amount")
 
-    st.markdown("---")
+        st.markdown("---")
 
-    # 图表
-    tab1, tab2, tab3, tab4 = st.tabs(["📈 总资产走势", "🥧 资产配置", "📊 标的表现", "📋 数据表格"])
-
-    with tab1:
+        # 总资产走势图
         render_total_assets_chart(portfolio_data)
 
     with tab2:
