@@ -1643,15 +1643,9 @@ def main():
     with st.sidebar:
         st.title("📊 导航")
 
-        # 初始化页面选择
+        # 初始化页面选择（只在首次加载时设置）
         if 'page_selection' not in st.session_state:
             st.session_state.page_selection = 0 if st.session_state.get('current_page') == 'dashboard' else 1
-
-        # 根据current_page更新索引（防止按钮跳转后radio不更新）
-        if st.session_state.get('current_page') == 'dashboard' and st.session_state.page_selection != 0:
-            st.session_state.page_selection = 0
-        elif st.session_state.get('current_page') == 'config' and st.session_state.page_selection != 1:
-            st.session_state.page_selection = 1
 
         page = st.radio(
             "选择页面",
