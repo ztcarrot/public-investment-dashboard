@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 from utils.data_fetcher import DataFetcher
 
 
-# 预定义的短债基金列表（随机选择10个知名基金）
+# 预定义的短债基金列表（知名基金 + 配置文件中的基金）
 SAMPLE_SHORT_BOND_FUNDS = [
     {"code": "005350", "name": "嘉实短债A"},
     {"code": "006986", "name": "华夏短债A"},
@@ -30,7 +30,66 @@ SAMPLE_SHORT_BOND_FUNDS = [
     {"code": "007898", "name": "中欧短债A"},
     {"code": "008086", "name": "汇添富短债A"},
     {"code": "008138", "name": "富国短债A"},
+    {"code": "5350", "name": "短债基金（用户配置）"},  # 来自配置文件
 ]
+
+
+def get_config_funds() -> List[Dict]:
+    """
+    从配置文件中获取短债基金
+
+    Returns:
+        短债基金列表
+    """
+    try:
+        import os
+        from utils.config_manager import parse_secrets_assets
+
+        # 读取配置文件
+        config_file = os.path.join(os.path.dirname(__file__).replace('utils', ''), '.streamlit', 'secrets.toml')
+
+        if not os.path.exists(config_file):
+            logger.debug("未找到 secrets.toml 配置文件")
+            return []
+
+        # 解析配置
+        import toml
+        with open(config_file, 'r', encoding='utf-8') as f:
+            config_data = toml.load(f)
+
+        assets = config_data.get('assets', [])
+        parsed_assets = parse_secrets_assets(assets)
+
+        # 筛选短债基金（代码类型为"债券"或"基金"，且资产类别为"现金"）
+        short_bond_funds = []
+        seen_codes = set()
+
+        for asset in parsed_assets:
+            code_type = asset.get('代码类型', '')
+            asset_category = asset.get('资产类别', '')
+            fund_name = asset.get('名称', '')
+            fund_code = asset.get('代码', '')
+
+            # 判断是否为短债基金
+            is_bond_fund = (
+                code_type in ['债券', '基金'] and
+                asset_category == '现金' and
+                '短债' in fund_name
+            )
+
+            if is_bond_fund and fund_code and fund_code not in seen_codes:
+                short_bond_funds.append({
+                    'code': fund_code,
+                    'name': fund_name
+                })
+                seen_codes.add(fund_code)
+
+        logger.info(f"从配置文件中找到 {len(short_bond_funds)} 只短债基金")
+        return short_bond_funds
+
+    except Exception as e:
+        logger.warning(f"读取配置文件失败: {e}")
+        return []
 
 
 def get_fund_performance(fund_code: str, fund_name: str = "") -> Optional[Dict]:
@@ -218,9 +277,23 @@ def screen_funds_simple(
 
 def get_sample_funds() -> List[Dict]:
     """
-    获取预定义的基金列表
+    获取预定义的基金列表 + 配置文件中的短债基金
 
     Returns:
-        基金列表
+        基金列表（已去重）
     """
-    return SAMPLE_SHORT_BOND_FUNDS.copy()
+    # 从配置文件获取短债基金
+    config_funds = get_config_funds()
+
+    # 合并预定义基金和配置基金，去重
+    seen_codes = {fund['code'] for fund in SAMPLE_SHORT_BOND_FUNDS}
+    all_funds = SAMPLE_SHORT_BOND_FUNDS.copy()
+
+    for fund in config_funds:
+        if fund['code'] not in seen_codes:
+            all_funds.append(fund)
+            seen_codes.add(fund['code'])
+
+    logger.info(f"基金列表总数: {len(all_funds)} (预定义: {len(SAMPLE_SHORT_BOND_FUNDS)}, 配置文件: {len(config_funds)})")
+
+    return all_funds
